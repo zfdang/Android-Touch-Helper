@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">屏幕助手</string>
+    <string name="title_home">状态</string>
+    <string name="title_settings">设置</string>
+    <string name="title_about">关于</string>
+    <string name="status_title">服务状态</string>
+    <string name="text_app_permission">1. 本程序需要使用本地存储，请在程序设置里，打开本地存储的选项。</string>
+    <string name="button_setting">设置</string>
+    <string name="text_accessibility_permission">2. 请检查如下设置，来，确保本程序需要使用本地存储，请在程序设置里，打开本地存储的选项。</string>
+    <string name="text_instructions">请检查如下设置，确保屏幕助手可以正常工作：</string>
+    <string name="touch_helper_service_label">屏幕助手服务</string>
+    <string name="touch_helper_service_description">屏幕助手的服务</string>
+</resources>
