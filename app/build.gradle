@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+// http://www.race604.com/android-auto-version/
+// use git count as build number, as current date as build version
+def getDate() {
+    def date = new Date()
+    def formattedDate = date.format('yy.MM.dd')
+    return formattedDate
+}
+def cmd = 'git rev-list HEAD --count'
+def gitVersion = cmd.execute().text.trim().toInteger() + 100
+def appVersion = getDate()
+
+
 android {
     compileSdkVersion 29
     buildToolsVersion "29.0.3"
@@ -8,18 +20,44 @@ android {
         applicationId "com.zfdang.touchhelper"
         minSdkVersion 26
         targetSdkVersion 29
-        versionCode 1
-        versionName "1.0"
+        versionCode gitVersion
+        versionName appVersion
+
+        // Enabling multidex support.
+        multiDexEnabled true
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
+
+    signingConfigs {
+        release {
+            storeFile file("touch_helper.keystore")
+            storePassword "touchhelper"
+            keyAlias "touchhelper"
+            keyPassword "touchhelper"
+        }
+    }
+
 
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
+
+    // http://www.sollyu.com/android-apk-studio-generated-automatically-appends-a-version-number/
+    android.applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            if(buildType.name == "release") {
+                output.outputFileName = new File("TouchHelper" + "-" + buildType.name + "-v" + defaultConfig.versionName + ".apk" );
+            } else {
+                output.outputFileName = new File("TouchHelper" + "-" + buildType.name + "-v" + defaultConfig.versionName + ".apk" );
+            }
+        }
+    }
+
 }
 
 dependencies {
