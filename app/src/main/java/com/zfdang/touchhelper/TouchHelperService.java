@@ -3,56 +3,55 @@ package com.zfdang.touchhelper;
 import android.accessibilityservice.AccessibilityService;
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.util.Log;
-import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 
 public class TouchHelperService extends AccessibilityService {
-    final private String TAG = "TouchHelperService";
-    private int create_num, connect_num;
-    public static TouchHelperFunctions mainFunctions;
 
+    public final static int ACTION_1 = 0x01;
+    public final static int ACTION_REFRESH_PACKAGE = 0x02;
+    public final static int ACTION_3 = 0x03;
+    public final static int ACTION_STOP_SERVICE = 0x04;
+    public final static int ACTION_5 = 0x05;
+
+    public static TouchHelperServiceImpl serviceImpl = null;
+
+    final private String TAG = getClass().getName();
 
     @Override
     public void onCreate() {
-        super.onCreate();
-        try {
-            create_num = 0;
-            connect_num = 0;
-            create_num++;
-        } catch (Throwable e) {
-            Log.d(TAG, e.getStackTrace().toString());
-        }
+        // do nothing here
+//        Log.d(TAG, "onCreate");
     }
+
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+//        Log.d(TAG, "onServiceConnected");
 
-        if (++connect_num != create_num) {
-            throw new RuntimeException("无障碍服务出现异常");
+        if (serviceImpl == null) {
+            serviceImpl = new TouchHelperServiceImpl(this);
         }
-        mainFunctions = new TouchHelperFunctions(this);
-        mainFunctions.onServiceConnected();
+        if (serviceImpl != null) {
+            serviceImpl.onServiceConnected();
+        }
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        Log.d(TAG, "onAccessibilityEvent" + event.toString());
-        mainFunctions.onAccessibilityEvent(event);
-    }
-
-
-    @Override
-    protected boolean onKeyEvent(KeyEvent event) {
-        return mainFunctions.onKeyEvent(event);
+//        Log.d(TAG, "onAccessibilityEvent" + event.toString());
+        if (serviceImpl != null) {
+            serviceImpl.onAccessibilityEvent(event);
+        }
     }
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
+//        Log.d(TAG, "onConfigurationChanged");
 
-        mainFunctions.onConfigurationChanged(newConfig);
+        if (serviceImpl != null) {
+            serviceImpl.onConfigurationChanged(newConfig);
+        }
     }
 
     @Override
@@ -62,9 +61,10 @@ public class TouchHelperService extends AccessibilityService {
 
     @Override
     public boolean onUnbind(Intent intent) {
-        mainFunctions.onUnbind(intent);
-        mainFunctions = null;
-
+        if (serviceImpl != null) {
+            serviceImpl.onUnbind(intent);
+            serviceImpl = null;
+        }
         return super.onUnbind(intent);
     }
 }
