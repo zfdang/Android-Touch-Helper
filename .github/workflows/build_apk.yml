@@ -1,0 +1,74 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Build_TouchHelper_APK
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - name: checkout codes
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: '0' # 0 indicates all history, this is needed for git revision 
+
+    - name: Set up JDK 1.8
+      uses: actions/setup-java@v1
+      with:
+        java-version: 1.8
+
+    - name: Assemble Release APK
+      run: ./gradlew assembleRelease --stacktrace
+  
+    - name: Upload APK to artifacts
+      uses: actions/upload-artifact@v1
+      with:
+        name: TouchHelper
+        path: ./app/build/outputs/apk/
+        
+    - name: Create ZIPs
+      working-directory: ./app/build/outputs/apk/
+      run: |
+        zip -r ./TouchHelper.zip ./release
+
+    - name: Get git revision
+      id: get_git_revision
+      run: |
+        echo "::set-output name=tag_name::$(($(git rev-list HEAD --count) + 100))"
+        echo "::set-output name=release_name::$(($(git rev-list HEAD --count) + 100))"
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+          tag_name: tag-${{ steps.get_git_revision.outputs.tag_name }}
+          release_name: Release ${{ steps.get_git_revision.outputs.release_name }}
+          draft: false
+          prerelease: false
+
+    - name: Upload Release APK
+      id: upload-release-asset-images
+      uses: actions/upload-release-asset@v1
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./app/build/outputs/apk/TouchHelper.zip
+          asset_name: TouchHelper.zip
+          asset_content_type: application/zip
