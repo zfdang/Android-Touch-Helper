@@ -11,25 +11,31 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProviders;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
+
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.SwitchPreferenceCompat;
 
 import com.zfdang.touchhelper.R;
 
-public class SettingsFragment extends Fragment {
+public class SettingsFragment extends PreferenceFragmentCompat {
 
-    private SettingsViewModel settingsViewModel;
+    @Override
+    public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+        setPreferencesFromResource(R.xml.touch_helper_preference, rootKey);
 
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             ViewGroup container, Bundle savedInstanceState) {
-        settingsViewModel =
-                ViewModelProviders.of(this).get(SettingsViewModel.class);
-        View root = inflater.inflate(R.layout.fragment_settings, container, false);
-        final TextView textView = root.findViewById(R.id.text_dashboard);
-        settingsViewModel.getText().observe(getViewLifecycleOwner(), new Observer<String>() {
+        initPreferences();
+    }
+
+    private void initPreferences() {
+        SwitchPreferenceCompat toglle = findPreference("toggle_summary");
+        toglle.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             @Override
-            public void onChanged(@Nullable String s) {
-                textView.setText(s);
+            public boolean onPreferenceClick(Preference preference) {
+                return false;
             }
         });
-        return root;
     }
+
 }

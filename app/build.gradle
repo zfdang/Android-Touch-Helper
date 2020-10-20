@@ -74,4 +74,7 @@ dependencies {
 
     implementation 'com.google.code.gson:gson:2.8.5'
 
+    // https://developer.android.com/jetpack/androidx/releases/preference?hl=zh-cn
+    implementation 'androidx.preference:preference:1.1.1'
+
 }

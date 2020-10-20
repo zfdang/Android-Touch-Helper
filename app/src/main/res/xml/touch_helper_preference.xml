@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright 2018 The Android Open Source Project
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~      http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="基础设置">
+
+        <CheckBoxPreference
+            app:icon="@drawable/ic_notification_24"
+            app:key="skip_ad_notification"
+            app:summaryOff="不显示通知"
+            app:summaryOn="显示跳过通知"
+            app:title="跳过广告时显示通知" />
+
+        <SwitchPreferenceCompat
+            app:dependency="skip_ad_notification"
+            app:key="skip_ad_notification_duration"
+            app:summaryOff="较短"
+            app:summaryOn="较长"
+            app:title="通知时间" />
+
+        <DropDownPreference
+            app:entries="@array/entries"
+            app:entryValues="@array/entry_values"
+            app:key="dropdown"
+            app:title="tring/title_dropdown_preference"
+            app:useSimpleSummaryProvider="true" />
+
+        <SeekBarPreference
+            app:defaultValue="20"
+            app:key="seekbar"
+            app:title="ring/title_seekbar_preference" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="adstring/basic_preferences">
+
+        <Preference
+            app:key="preference"
+            app:summary="/summary_basic_preference"
+            app:title="ag/title_basic_preference" />
+
+        <Preference
+            app:key="stylized"
+            app:summary="summary_stylish_preference"
+            app:title="string/title_stylish_preference" />
+
+        <Preference
+            app:icon="@drawable/ic_nav_home_24"
+            app:key="icon"
+            app:summary="ing/summary_icon_preference"
+            app:title="tring/title_icon_preference" />
+
+        <Preference
+            app:key="single_line_title"
+            app:singleLineTitle="true"
+            app:summary="ng/summary_single_line_title_preference"
+            app:title="/title_single_line_title_preference" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:initialExpandedChildrenCount="1"
+        app:key="advanced"
+        app:title="高级设置">
+
+        <Preference
+            app:key="expandable"
+            app:summary="summary_expandable_preference"
+            app:title="title_expandable_preference" />
+
+        <Preference
+            app:summary="summary_intent_preference"
+            app:title="title_intent_preference">
+
+            <intent
+                android:action="android.intent.action.VIEW"
+                android:data="http://www.android.com" />
+
+        </Preference>
+
+        <SwitchPreferenceCompat
+            app:key="parent"
+            app:summary="summary_parent_preference"
+            app:title="itle_parent_preference" />
+
+        <SwitchPreferenceCompat
+            app:dependency="parent"
+            app:key="child"
+            app:summary="ary_child_preference"
+            app:title="tle_child_preference" />
+
+        <SwitchPreferenceCompat
+            app:key="toggle_summary"
+            app:summaryOff="y_off_toggle_summary_preference"
+            app:summaryOn="ummary_on_toggle_summary_preference"
+            app:title="_toggle_summary_preference" />
+
+        <Preference
+            app:enableCopying="true"
+            app:key="copyable"
+            app:selectable="false"
+            app:summary="ry_copyable_preference"
+            app:title="copyable_preference" />
+    </PreferenceCategory>
+
+</PreferenceScreen>
