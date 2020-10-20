@@ -2,6 +2,7 @@ package com.zfdang.touchhelper;
 
 import android.app.Activity;
 import android.content.SharedPreferences;
+import android.util.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -9,6 +10,7 @@ import com.zfdang.TouchHelperApp;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -112,10 +114,13 @@ public class Settings {
     private static final String KEY_WORDS_LIST = "KEY_WORDS_LIST";
     private ArrayList<String> listKeyWords;
     public List<String> getKeyWordList() { return listKeyWords; }
-    public void setKeyWordList(List<String> keys) {
+    public String getKeyWordsAsString() { return String.join(" ", listKeyWords); }
+    public void setKeyWordList(String text) {
+        String keys[] = text.split(" ");
         listKeyWords.clear();
-        listKeyWords.addAll(keys);
+        listKeyWords.addAll(Arrays.asList(keys));
         String json = mJson.toJson(listKeyWords);
+        Log.d(TAG, json);
         mEditor.putString(KEY_WORDS_LIST, json);
         mEditor.apply();
     }
@@ -127,6 +132,7 @@ public class Settings {
     public void setActivityWidgets(Map<String, Set<ActivityWidgetDescription>> map) {
         mapActivityWidgets = map;
         String json = mJson.toJson(mapActivityWidgets);
+        Log.d(TAG, json);
         mEditor.putString(ACTIVITY_WIDGETS, json);
         mEditor.apply();
     }
@@ -138,6 +144,7 @@ public class Settings {
     public void setActivityPositions(Map<String, ActivityPositionDescription> map) {
         mapActivityPositions = map;
         String json = mJson.toJson(mapActivityPositions);
+        Log.d(TAG, json);
         mEditor.putString(ACTIVITY_POSITIONS, json);
         mEditor.apply();
     }

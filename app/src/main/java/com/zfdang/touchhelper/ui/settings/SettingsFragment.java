@@ -18,10 +18,13 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.preference.EditTextPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
@@ -68,6 +71,25 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
                     return false;
+                }
+            });
+        }
+
+        EditTextPreference textKeyWords = findPreference("setting_key_words");
+        if(textKeyWords != null) {
+            textKeyWords.setText(mSetting.getKeyWordsAsString());
+            textKeyWords.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    String text = newValue.toString();
+                    mSetting.setKeyWordList(text);
+
+                    // notify accessibility to refresh packages
+                    if (TouchHelperService.serviceImpl != null) {
+                        TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_REFRESH_KEYWORDS);
+                    }
+
+                    return true;
                 }
             });
         }

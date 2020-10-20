@@ -71,6 +71,7 @@ public class TouchHelperServiceImpl {
 
             // key words
             keyWordList = mSetting.getKeyWordList();
+            Log.d(TAG, keyWordList.toString());
 
             // whitelist of packages
             pkgWhiteList = mSetting.getWhitelistPackages();
@@ -120,9 +121,11 @@ public class TouchHelperServiceImpl {
                 switch (msg.what) {
                     case TouchHelperService.ACTION_REFRESH_KEYWORDS:
                         keyWordList = mSetting.getKeyWordList();
+                        Log.d(TAG, keyWordList.toString());
                         break;
                     case TouchHelperService.ACTION_REFRESH_PACKAGE:
                         pkgWhiteList = mSetting.getWhitelistPackages();
+                        Log.d(TAG, pkgWhiteList.toString());
                         updatePackage();
                         break;
                     case TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY:
@@ -178,7 +181,8 @@ public class TouchHelperServiceImpl {
     // 1. TYPE_WINDOW_STATE_CHANGED, 判断packageName和activityName
     // 2. TYPE_WINDOW_CONTENT_CHANGED, 尝试两种方法去跳过广告；如果重复次数超出预设，停止尝试
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName() + " - " + event.getClassName());
+        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName()
+                + " - " + event.getClassName() + "; " + currentPackageName + " - " + currentActivityName);
         try {
             switch (event.getEventType()) {
                 case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
@@ -202,6 +206,7 @@ public class TouchHelperServiceImpl {
                                 // new activity in the package, this means this activity is not the first activity any more
                                 // stop skip ad process
                                 stopSkipAdProcess();
+                                currentActivityName = actName;
                                 break;
                             }
                         }

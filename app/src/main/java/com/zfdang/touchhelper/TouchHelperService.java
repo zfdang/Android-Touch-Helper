@@ -56,7 +56,6 @@ public class TouchHelperService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
-
     }
 
     @Override
