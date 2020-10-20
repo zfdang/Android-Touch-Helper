@@ -2,7 +2,6 @@ package com.zfdang.touchhelper;
 
 import android.app.Activity;
 import android.content.SharedPreferences;
-import android.util.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -12,7 +11,9 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 public class Settings {
     private final String TAG = "Settings";
@@ -45,18 +46,38 @@ public class Settings {
         // https://stackoverflow.com/questions/10720028/android-sharedpreferences-not-saving
         // Note that you must not modify the set instance returned by this call. The consistency of the stored data is not guaranteed if you do, nor is your ability to modify the instance at all.
         setWhiteListPackages = new HashSet<String>(mPreference.getStringSet(WHITELIST_PACKAGE, new HashSet<String>()));
-        Log.d(TAG, "WhiteList = " + setWhiteListPackages.toString());
 
         // init key words
-        String json = mPreference.getString(KEY_WORDS_LIST, "");
-        Type type = new TypeToken<ArrayList<String>>() {}.getType();
-        listKeyWords = mJson.fromJson(json, type);
-        if(listKeyWords == null) {
+        String json = mPreference.getString(KEY_WORDS_LIST, null);
+        if(json != null) {
+            Type type = new TypeToken<ArrayList<String>>() {}.getType();
+            listKeyWords = mJson.fromJson(json, type);
+        } else {
             listKeyWords = new ArrayList<>();
         }
         if(listKeyWords.size() == 0) {
             listKeyWords.add("跳过");
+            listKeyWords.add("跳过广告");
         }
+
+        // load activity widgets
+        json = mPreference.getString(ACTIVITY_WIDGETS, null);
+        if (json != null) {
+            Type type = new TypeToken<TreeMap<String, Set<ActivityWidgetDescription>>>() {}.getType();
+            mapActivityWidgets = mJson.fromJson(json, type);
+        } else {
+            mapActivityWidgets = new TreeMap<>();
+        }
+
+        // load activity positions
+        json = mPreference.getString(ACTIVITY_POSITIONS, null);
+        if (json != null) {
+            Type type = new TypeToken<TreeMap<String, ActivityPositionDescription>>() {}.getType();
+            mapActivityPositions = mJson.fromJson(json, type);
+        } else {
+            mapActivityPositions = new TreeMap<>();
+        }
+
     }
 
     // notification on skip ads?
@@ -96,6 +117,28 @@ public class Settings {
         listKeyWords.addAll(keys);
         String json = mJson.toJson(listKeyWords);
         mEditor.putString(KEY_WORDS_LIST, json);
+        mEditor.apply();
+    }
+
+    // map of key activity widgets
+    private static final String ACTIVITY_WIDGETS = "ACTIVITY_WIDGETS";
+    private Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
+    public Map<String, Set<ActivityWidgetDescription>> getActivityWidgets() { return mapActivityWidgets; }
+    public void setActivityWidgets(Map<String, Set<ActivityWidgetDescription>> map) {
+        mapActivityWidgets = map;
+        String json = mJson.toJson(mapActivityWidgets);
+        mEditor.putString(ACTIVITY_WIDGETS, json);
+        mEditor.apply();
+    }
+
+    // map of key activity widgets
+    private static final String ACTIVITY_POSITIONS = "ACTIVITY_POSITIONS";
+    private Map<String, ActivityPositionDescription> mapActivityPositions;
+    public Map<String, ActivityPositionDescription> getActivityPositions() { return mapActivityPositions; }
+    public void setActivityPositions(Map<String, ActivityPositionDescription> map) {
+        mapActivityPositions = map;
+        String json = mJson.toJson(mapActivityPositions);
+        mEditor.putString(ACTIVITY_POSITIONS, json);
         mEditor.apply();
     }
 

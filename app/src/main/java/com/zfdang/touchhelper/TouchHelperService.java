@@ -9,7 +9,7 @@ public class TouchHelperService extends AccessibilityService {
 
     public final static int ACTION_REFRESH_KEYWORDS = 0x01;
     public final static int ACTION_REFRESH_PACKAGE = 0x02;
-    public final static int ACTION_REFRESH_KNOWN_ACTIVITY = 0x03;
+    public final static int ACTION_REFRESH_CUSTOMIZED_ACTIVITY = 0x03;
     public final static int ACTION_STOP_SERVICE = 0x04;
     public final static int ACTION_5 = 0x05;
 

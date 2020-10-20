@@ -11,22 +11,14 @@ import android.content.res.Configuration;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.os.Build;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.util.DisplayMetrics;
 import android.util.Log;
-import android.util.TypedValue;
-import android.view.View;
-import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.ImageView;
-import android.widget.TextView;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -38,33 +30,29 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class TouchHelperServiceImpl {
-    private static final String TAG = "TouchHelperServiceImpl";
 
-    private static final String ACTIVITY_POSITION = "activity_position";
-    private static final String ACTIVITY_WIDGET = "activity_widget";
+    private static final String TAG = "TouchHelperServiceImpl";
+    private AccessibilityService service;
+
+    private Settings mSetting;
 
     // broadcast receiver handler
+    private TouchHelperServiceReceiver installReceiver;
     public Handler receiverHandler;
-    private AccessibilityService service;
 
     private ScheduledExecutorService executorService;
     private ScheduledFuture futureExpireSkipAdProcess;
 
     private boolean b_method_by_known_activity_position, b_method_by_known_activity_widget, b_method_by_button_text;
-    private Settings mSetting;
     private PackageManager packageManager;
-    private Set<String> pkgLaunchers, pkgWhiteList;
-    private List<String> keyWordList;
-    private Map<String, SkipPositionDescribe> mapKnownActivityPositions;
-    private Map<String, Set<WidgetButtonDescribe>> mapKnownActivityWidgets;
     private String currentPackageName, currentActivityName;
     private String packageName;
-    private WindowManager windowManager;
-    private TouchHelperServiceReceiver installReceiver;
-    private Set<WidgetButtonDescribe> widgetSet;
-    private WindowManager.LayoutParams aParams, bParams, cParams;
-    private View adv_view, layout_win;
-    private ImageView target_xy;
+    private Set<String> pkgLaunchers, pkgWhiteList;
+    private List<String> keyWordList;
+
+    private Map<String, ActivityPositionDescription> mapActivityPositions;
+    private Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
+    private Set<ActivityWidgetDescription> setWidgets;
 
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
@@ -87,15 +75,16 @@ public class TouchHelperServiceImpl {
             // whitelist of packages
             pkgWhiteList = mSetting.getWhitelistPackages();
 
+            // load pre-defined widgets or positions
+            mapActivityWidgets = mSetting.getActivityWidgets();
+            mapActivityPositions = mSetting.getActivityPositions();
+
             // collect all installed packages
             packageManager = service.getPackageManager();
             updatePackage();
 
             // install receiver and handler for broadcasting events
             InstallReceiverAndHandler();
-
-            //
-            windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
 
             // create future task
             executorService = Executors.newSingleThreadScheduledExecutor();
@@ -104,26 +93,6 @@ public class TouchHelperServiceImpl {
                 public void run() {
                 }
             }, 0, TimeUnit.MILLISECONDS);
-
-
-//            String aJson = sharedPreferences.getString(ACTIVITY_WIDGET, null);
-//            if (aJson != null) {
-//                Type type = new TypeToken<TreeMap<String, Set<WidgetButtonDescribe>>>() {
-//                }.getType();
-//                mapKnownActivityWidgets = new Gson().fromJson(aJson, type);
-//            } else {
-//                mapKnownActivityWidgets = new TreeMap<>();
-//            }
-//            String bJson = sharedPreferences.getString(ACTIVITY_POSITION, null);
-//            if (bJson != null) {
-//                Type type = new TypeToken<TreeMap<String, SkipPositionDescribe>>() {
-//                }.getType();
-//                mapKnownActivityPositions = new Gson().fromJson(bJson, type);
-//            } else {
-//                mapKnownActivityPositions = new TreeMap<>();
-//            }
-
-
         } catch (Throwable e) {
             Log.e(TAG, Utilities.getTraceStackInString(e));
         }
@@ -156,8 +125,9 @@ public class TouchHelperServiceImpl {
                         pkgWhiteList = mSetting.getWhitelistPackages();
                         updatePackage();
                         break;
-                    case 0x03:
-                        currentPackageName = "ScreenOff PackageName";
+                    case TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY:
+                        mapActivityWidgets = mSetting.getActivityWidgets();
+                        mapActivityPositions = mSetting.getActivityPositions();
                         break;
                     case TouchHelperService.ACTION_STOP_SERVICE:
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -208,7 +178,7 @@ public class TouchHelperServiceImpl {
     // 1. TYPE_WINDOW_STATE_CHANGED, 判断packageName和activityName
     // 2. TYPE_WINDOW_CONTENT_CHANGED, 尝试两种方法去跳过广告；如果重复次数超出预设，停止尝试
     public void onAccessibilityEvent(AccessibilityEvent event) {
-//        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName() + " - " + event.getClassName());
+        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName() + " - " + event.getClassName());
         try {
             switch (event.getEventType()) {
                 case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
@@ -255,8 +225,8 @@ public class TouchHelperServiceImpl {
 
                     // now to take different methods to skip ads
                     if (b_method_by_known_activity_position) {
-                        final SkipPositionDescribe skipPositionDescribe = mapKnownActivityPositions.get(actName);
-                        if (skipPositionDescribe != null) {
+                        final ActivityPositionDescription activityPositionDescription = mapActivityPositions.get(actName);
+                        if (activityPositionDescription != null) {
                             b_method_by_known_activity_position = false;
                             b_method_by_button_text = false;
                             futureExpireSkipAdProcess.cancel(false);
@@ -265,21 +235,21 @@ public class TouchHelperServiceImpl {
                                 int num = 0;
                                 @Override
                                 public void run() {
-                                    if (num < skipPositionDescribe.number && currentActivityName.equals(skipPositionDescribe.activityName)) {
-                                        click(skipPositionDescribe.x, skipPositionDescribe.y, 0, 20);
+                                    if (num < activityPositionDescription.number && currentActivityName.equals(activityPositionDescription.activityName)) {
+                                        click(activityPositionDescription.x, activityPositionDescription.y, 0, 20);
                                         num++;
                                     } else {
                                         throw new RuntimeException();
                                     }
                                 }
-                            }, skipPositionDescribe.delay, skipPositionDescribe.period, TimeUnit.MILLISECONDS);
+                            }, activityPositionDescription.delay, activityPositionDescription.period, TimeUnit.MILLISECONDS);
                         }
                     }
 
                     if (b_method_by_known_activity_widget) {
-                        widgetSet = mapKnownActivityWidgets.get(actName);
-                        if(widgetSet != null) {
-                            findSkipButtonByWidget(service.getRootInActiveWindow(), widgetSet);
+                        setWidgets = mapActivityWidgets.get(actName);
+                        if(setWidgets != null) {
+                            findSkipButtonByWidget(service.getRootInActiveWindow(), setWidgets);
                         }
                     }
 
@@ -292,8 +262,8 @@ public class TouchHelperServiceImpl {
                         // do nothing if package name is new
                         break;
                     }
-                    if (b_method_by_known_activity_widget && widgetSet != null) {
-                        findSkipButtonByWidget(event.getSource(), widgetSet);
+                    if (b_method_by_known_activity_widget && setWidgets != null) {
+                        findSkipButtonByWidget(event.getSource(), setWidgets);
                     }
                     if (b_method_by_button_text) {
                         findSkipButtonByText(event.getSource());
@@ -308,27 +278,7 @@ public class TouchHelperServiceImpl {
     }
 
     public void onConfigurationChanged(Configuration newConfig) {
-        try {
-            if (adv_view != null && target_xy != null && layout_win != null) {
-                DisplayMetrics metrics = new DisplayMetrics();
-                windowManager.getDefaultDisplay().getRealMetrics(metrics);
-                cParams.x = (metrics.widthPixels - cParams.width) / 2;
-                cParams.y = (metrics.heightPixels - cParams.height) / 2;
-                aParams.x = (metrics.widthPixels - aParams.width) / 2;
-                aParams.y = metrics.heightPixels - aParams.height;
-                windowManager.updateViewLayout(adv_view, aParams);
-                windowManager.updateViewLayout(target_xy, cParams);
-//                FrameLayout layout = layout_win.findViewById(R.id.frame);
-//                layout.removeAllViews();
-                TextView text = new TextView(service);
-                text.setTextSize(TypedValue.COMPLEX_UNIT_SP, 30);
-                text.setTextColor(0xffff0000);
-                text.setText("请重新刷新布局");
-//                layout.addView(text, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
-            }
-        } catch (Throwable e) {
-            Log.e(TAG, Utilities.getTraceStackInString(e));
-        }
+        // do nothing here
     }
 
     public void onUnbind(Intent intent) {
@@ -348,8 +298,8 @@ public class TouchHelperServiceImpl {
             List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText(keyWordList.get(n));
             if (!list.isEmpty()) {
                 for (AccessibilityNodeInfo e : list) {
-                    Log.d(TAG, "find button to click " + e.toString());
-                    Utilities.printNodeStack(e);
+                    Log.d(TAG, "Find skip button " + e.toString());
+//                    Utilities.printNodeStack(e);
                     if (!e.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                         if (!e.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                             Rect rect = new Rect();
@@ -370,7 +320,7 @@ public class TouchHelperServiceImpl {
     /**
      * 查找并点击由WidgetButtonDescribe定义的控件
      */
-    private void findSkipButtonByWidget(AccessibilityNodeInfo root, Set<WidgetButtonDescribe> set) {
+    private void findSkipButtonByWidget(AccessibilityNodeInfo root, Set<ActivityWidgetDescription> set) {
         int a = 0;
         int b = 1;
         ArrayList<AccessibilityNodeInfo> listA = new ArrayList<>();
@@ -384,7 +334,7 @@ public class TouchHelperServiceImpl {
                 CharSequence cId = node.getViewIdResourceName();
                 CharSequence cDescribe = node.getContentDescription();
                 CharSequence cText = node.getText();
-                for (WidgetButtonDescribe e : set) {
+                for (ActivityWidgetDescription e : set) {
                     boolean isFind = false;
                     if (temRect.equals(e.bonus)) {
                         isFind = true;
@@ -405,7 +355,7 @@ public class TouchHelperServiceImpl {
                                 }
                             }
                         }
-                        widgetSet = null;
+                        setWidgets = null;
                         return;
                     }
                 }
@@ -458,12 +408,10 @@ public class TouchHelperServiceImpl {
      * 关闭ContentChanged事件的响应
      */
     private void startSkipAdProcess() {
-//        Log.d(TAG, "startSkipAdProcess");
-
         b_method_by_known_activity_position = true;
         b_method_by_known_activity_widget = true;
         b_method_by_button_text = true;
-        widgetSet = null;
+        setWidgets = null;
 
         // cancel all methods 5 seconds later
         if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
@@ -483,12 +431,10 @@ public class TouchHelperServiceImpl {
      * 关闭ContentChanged事件的响应
      */
     private void stopSkipAdProcess() {
-//        Log.d(TAG, "stopSkipAdProcess");
-
         b_method_by_known_activity_position = false;
         b_method_by_known_activity_widget = false;
         b_method_by_button_text = false;
-        widgetSet = null;
+        setWidgets = null;
         if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
             futureExpireSkipAdProcess.cancel(true);
         }
@@ -533,10 +479,6 @@ public class TouchHelperServiceImpl {
         pkgTemps.add(packageName);
         pkgTemps.add("com.android.systemui");
         pkgTemps.add("com.android.packageinstaller");
-
-        // keep only existed launchers in the white list
-        pkgWhiteList.retainAll(pkgLaunchers);
-        Log.d(TAG, "White List = " + pkgWhiteList.toString());
 
         // remove whitelist, system, homes & ad-hoc packagesfrom pkgLaunchers
         pkgLaunchers.removeAll(pkgWhiteList);

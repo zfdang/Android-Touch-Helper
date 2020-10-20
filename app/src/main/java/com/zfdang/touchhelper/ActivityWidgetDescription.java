@@ -4,12 +4,12 @@ import android.graphics.Rect;
 
 import java.util.Objects;
 
-public class WidgetButtonDescribe {
+public class ActivityWidgetDescription {
     public String packageName, activityName, className, idName, describe, text;
     public Rect bonus;
     public boolean clickable, onlyClick;
 
-    public WidgetButtonDescribe() {
+    public ActivityWidgetDescription() {
         this.packageName = "";
         this.activityName = "";
         this.className = "";
@@ -21,7 +21,7 @@ public class WidgetButtonDescribe {
         this.onlyClick = false;
     }
 
-    public WidgetButtonDescribe(String packageName, String activityName, String className, String idName, String describe, String text, Rect bonus, boolean clickable, boolean onlyClick) {
+    public ActivityWidgetDescription(String packageName, String activityName, String className, String idName, String describe, String text, Rect bonus, boolean clickable, boolean onlyClick) {
         this.packageName = packageName;
         this.activityName = activityName;
         this.className = className;
@@ -33,7 +33,7 @@ public class WidgetButtonDescribe {
         this.onlyClick = onlyClick;
     }
 
-    public WidgetButtonDescribe(WidgetButtonDescribe widgetDescribe) {
+    public ActivityWidgetDescription(ActivityWidgetDescription widgetDescribe) {
         this.packageName = widgetDescribe.packageName;
         this.activityName = widgetDescribe.activityName;
         this.className = widgetDescribe.className;
@@ -50,8 +50,8 @@ public class WidgetButtonDescribe {
     public boolean equals(Object obj) {
         if (obj == null) return false;
         if (this == obj) return true;
-        if (!(obj instanceof WidgetButtonDescribe)) return false;
-        WidgetButtonDescribe widget = (WidgetButtonDescribe) obj;
+        if (!(obj instanceof ActivityWidgetDescription)) return false;
+        ActivityWidgetDescription widget = (ActivityWidgetDescription) obj;
         return bonus.equals(widget.bonus);
     }
 

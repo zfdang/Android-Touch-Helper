@@ -1,6 +1,6 @@
 package com.zfdang.touchhelper;
 
-public class SkipPositionDescribe {
+public class ActivityPositionDescription {
     public String packageName;
     public String activityName;
     public int x;
@@ -9,7 +9,7 @@ public class SkipPositionDescribe {
     public int period;
     public int number;
 
-    public SkipPositionDescribe() {
+    public ActivityPositionDescription() {
         this.packageName = "";
         this.activityName = "";
         this.x = 0;
@@ -19,7 +19,7 @@ public class SkipPositionDescribe {
         this.number = 0;
     }
 
-    public SkipPositionDescribe(String packageName, String activityName, int x, int y, int delay, int period, int number) {
+    public ActivityPositionDescription(String packageName, String activityName, int x, int y, int delay, int period, int number) {
         this.packageName = packageName;
         this.activityName = activityName;
         this.x = x;
@@ -29,7 +29,7 @@ public class SkipPositionDescribe {
         this.number = number;
     }
 
-    public SkipPositionDescribe(SkipPositionDescribe position) {
+    public ActivityPositionDescription(ActivityPositionDescription position) {
         this.packageName = position.packageName;
         this.activityName = position.activityName;
         this.x = position.x;
