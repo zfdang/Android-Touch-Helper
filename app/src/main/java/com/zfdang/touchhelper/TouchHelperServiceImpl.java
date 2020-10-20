@@ -4,7 +4,6 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -27,17 +26,12 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
 import java.io.File;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -45,9 +39,6 @@ import java.util.concurrent.TimeUnit;
 
 public class TouchHelperServiceImpl {
     private static final String TAG = "TouchHelperServiceImpl";
-
-    public static final String PACKAGES_WHITELIST = "pkgs_whitelist";
-    public static final String KEY_WORD_LIST = "key_words_list";
 
     private static final String ACTIVITY_POSITION = "activity_position";
     private static final String ACTIVITY_WIDGET = "activity_widget";
@@ -60,10 +51,10 @@ public class TouchHelperServiceImpl {
     private ScheduledFuture futureExpireSkipAdProcess;
 
     private boolean b_method_by_known_activity_position, b_method_by_known_activity_widget, b_method_by_button_text;
-    private SharedPreferences sharedPreferences;
+    private Settings mSetting;
     private PackageManager packageManager;
     private Set<String> pkgLaunchers, pkgWhiteList;
-    private ArrayList<String> keyWordList;
+    private List<String> keyWordList;
     private Map<String, SkipPositionDescribe> mapKnownActivityPositions;
     private Map<String, Set<WidgetButtonDescribe>> mapKnownActivityWidgets;
     private String currentPackageName, currentActivityName;
@@ -88,19 +79,13 @@ public class TouchHelperServiceImpl {
             packageName = service.getPackageName();
 
             // read settings from sharedPreferences
-            sharedPreferences = service.getSharedPreferences(packageName, AccessibilityService.MODE_PRIVATE);
-            pkgWhiteList = sharedPreferences.getStringSet(PACKAGES_WHITELIST, null);
+            mSetting = Settings.getInstance();
 
             // key words
-            String cJson = sharedPreferences.getString(KEY_WORD_LIST, null);
-            if (cJson != null) {
-                Type type = new TypeToken<ArrayList<String>>() {
-                }.getType();
-                keyWordList = new Gson().fromJson(cJson, type);
-            } else {
-                keyWordList = new ArrayList<>();
-                keyWordList.add("跳过");
-            }
+            keyWordList = mSetting.getKeyWordList();
+
+            // whitelist of packages
+            pkgWhiteList = mSetting.getWhitelistPackages();
 
             // collect all installed packages
             packageManager = service.getPackageManager();
@@ -126,22 +111,22 @@ public class TouchHelperServiceImpl {
                 file.mkdirs();
             }
             savePath = file.getAbsolutePath();
-            String aJson = sharedPreferences.getString(ACTIVITY_WIDGET, null);
-            if (aJson != null) {
-                Type type = new TypeToken<TreeMap<String, Set<WidgetButtonDescribe>>>() {
-                }.getType();
-                mapKnownActivityWidgets = new Gson().fromJson(aJson, type);
-            } else {
-                mapKnownActivityWidgets = new TreeMap<>();
-            }
-            String bJson = sharedPreferences.getString(ACTIVITY_POSITION, null);
-            if (bJson != null) {
-                Type type = new TypeToken<TreeMap<String, SkipPositionDescribe>>() {
-                }.getType();
-                mapKnownActivityPositions = new Gson().fromJson(bJson, type);
-            } else {
-                mapKnownActivityPositions = new TreeMap<>();
-            }
+//            String aJson = sharedPreferences.getString(ACTIVITY_WIDGET, null);
+//            if (aJson != null) {
+//                Type type = new TypeToken<TreeMap<String, Set<WidgetButtonDescribe>>>() {
+//                }.getType();
+//                mapKnownActivityWidgets = new Gson().fromJson(aJson, type);
+//            } else {
+//                mapKnownActivityWidgets = new TreeMap<>();
+//            }
+//            String bJson = sharedPreferences.getString(ACTIVITY_POSITION, null);
+//            if (bJson != null) {
+//                Type type = new TypeToken<TreeMap<String, SkipPositionDescribe>>() {
+//                }.getType();
+//                mapKnownActivityPositions = new Gson().fromJson(bJson, type);
+//            } else {
+//                mapKnownActivityPositions = new TreeMap<>();
+//            }
 
 
         } catch (Throwable e) {
@@ -169,9 +154,11 @@ public class TouchHelperServiceImpl {
             @Override
             public boolean handleMessage(Message msg) {
                 switch (msg.what) {
-                    case TouchHelperService.ACTION_1:
+                    case TouchHelperService.ACTION_REFRESH_KEYWORDS:
+                        keyWordList = mSetting.getKeyWordList();
                         break;
                     case TouchHelperService.ACTION_REFRESH_PACKAGE:
+                        pkgWhiteList = mSetting.getWhitelistPackages();
                         updatePackage();
                         break;
                     case 0x03:
@@ -226,8 +213,7 @@ public class TouchHelperServiceImpl {
     // 1. TYPE_WINDOW_STATE_CHANGED, 判断packageName和activityName
     // 2. TYPE_WINDOW_CONTENT_CHANGED, 尝试两种方法去跳过广告；如果重复次数超出预设，停止尝试
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName() + " - " + event.getClassName());
-
+//        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName() + " - " + event.getClassName());
         try {
             switch (event.getEventType()) {
                 case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
@@ -528,7 +514,7 @@ public class TouchHelperServiceImpl {
         Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
         for (ResolveInfo e : ResolveInfoList) {
-            Log.d(TAG, "launcher - " + e.activityInfo.packageName);
+//            Log.d(TAG, "launcher - " + e.activityInfo.packageName);
             pkgLaunchers.add(e.activityInfo.packageName);
             if ((e.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == ApplicationInfo.FLAG_SYSTEM) {
                 pkgSystems.add(e.activityInfo.packageName);
@@ -538,13 +524,13 @@ public class TouchHelperServiceImpl {
         intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
         ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
         for (ResolveInfo e : ResolveInfoList) {
-            Log.d(TAG, "homes - " + e.activityInfo.packageName);
+//            Log.d(TAG, "homes - " + e.activityInfo.packageName);
             pkgHomes.add(e.activityInfo.packageName);
         }
         // find all input methods
         List<InputMethodInfo> inputMethodInfoList = ((InputMethodManager) service.getSystemService(AccessibilityService.INPUT_METHOD_SERVICE)).getInputMethodList();
         for (InputMethodInfo e : inputMethodInfoList) {
-            Log.d(TAG, "IME - " + e.getPackageName());
+//            Log.d(TAG, "IME - " + e.getPackageName());
             pkgTemps.add(e.getPackageName());
         }
         // add some adhoc packages
@@ -553,23 +539,15 @@ public class TouchHelperServiceImpl {
         pkgTemps.add("com.android.systemui");
         pkgTemps.add("com.android.packageinstaller");
 
-
-        // whiteList are customized by users, only remove non-existed pkgs
-        if (pkgWhiteList == null) {
-            pkgWhiteList = new HashSet<>();
-        } else {
-            // keep only existed launchers in the white list
-            pkgWhiteList.retainAll(pkgLaunchers);
-            // save the whitelist
-            sharedPreferences.edit().putStringSet(PACKAGES_WHITELIST, pkgWhiteList).apply();
-        }
-        Log.d(TAG, pkgWhiteList.toString());
+        // keep only existed launchers in the white list
+        pkgWhiteList.retainAll(pkgLaunchers);
+        Log.d(TAG, "White List = " + pkgWhiteList.toString());
 
         // remove whitelist, system, homes & ad-hoc packagesfrom pkgLaunchers
         pkgLaunchers.removeAll(pkgWhiteList);
         pkgLaunchers.removeAll(pkgSystems);
         pkgLaunchers.removeAll(pkgHomes);
         pkgLaunchers.removeAll(pkgTemps);
-        Log.d(TAG, pkgLaunchers.toString());
+        Log.d(TAG, "Working List = " + pkgLaunchers.toString());
     }
 }

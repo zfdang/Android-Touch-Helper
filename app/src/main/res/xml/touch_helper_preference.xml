@@ -31,12 +31,26 @@
             app:title="ring/title_seekbar_preference" />
     </PreferenceCategory>
 
-    <PreferenceCategory app:title="adstring/basic_preferences">
+    <PreferenceCategory app:title="广告过滤设置">
+
+        <EditTextPreference
+            app:key="setting_key_word"
+            app:title="广告关键字"
+            app:useSimpleSummaryProvider="true"
+            app:dialogTitle="设置广告按钮关键字"/>
+
+        <MultiSelectListPreference
+            app:key="setting_whitelist_1"
+            app:title="程序白名单"
+            app:summary="设置不跳过的应用程序"
+            app:entries="@array/entries"
+            app:entryValues="@array/entry_values"
+            app:dialogTitle="选择不跳过的程序"/>
 
         <Preference
-            app:key="preference"
-            app:summary="/summary_basic_preference"
-            app:title="ag/title_basic_preference" />
+            app:key="setting_whitelist"
+            app:summary="设置不跳过广告的程序"
+            app:title="应用程序白名单" />
 
         <Preference
             app:key="stylized"
