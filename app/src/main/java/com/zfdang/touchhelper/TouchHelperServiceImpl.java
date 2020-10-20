@@ -58,7 +58,7 @@ public class TouchHelperServiceImpl {
     private Map<String, SkipPositionDescribe> mapKnownActivityPositions;
     private Map<String, Set<WidgetButtonDescribe>> mapKnownActivityWidgets;
     private String currentPackageName, currentActivityName;
-    private String savePath, packageName;
+    private String packageName;
     private WindowManager windowManager;
     private TouchHelperServiceReceiver installReceiver;
     private Set<WidgetButtonDescribe> widgetSet;
@@ -106,11 +106,6 @@ public class TouchHelperServiceImpl {
             }, 0, TimeUnit.MILLISECONDS);
 
 
-            File file = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
-            if (!file.exists()) {
-                file.mkdirs();
-            }
-            savePath = file.getAbsolutePath();
 //            String aJson = sharedPreferences.getString(ACTIVITY_WIDGET, null);
 //            if (aJson != null) {
 //                Type type = new TypeToken<TreeMap<String, Set<WidgetButtonDescribe>>>() {
@@ -130,7 +125,7 @@ public class TouchHelperServiceImpl {
 
 
         } catch (Throwable e) {
-            Log.d(TAG, e.getStackTrace().toString());
+            Log.e(TAG, Utilities.getTraceStackInString(e));
         }
     }
 
@@ -308,7 +303,7 @@ public class TouchHelperServiceImpl {
                     break;
             }
         } catch (Throwable e) {
-            Log.d(TAG, e.getStackTrace().toString());
+            Log.e(TAG, Utilities.getTraceStackInString(e));
         }
     }
 
@@ -332,7 +327,7 @@ public class TouchHelperServiceImpl {
 //                layout.addView(text, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            Log.e(TAG, Utilities.getTraceStackInString(e));
         }
     }
 
@@ -340,7 +335,7 @@ public class TouchHelperServiceImpl {
         try {
             service.unregisterReceiver(installReceiver);
         } catch (Throwable e) {
-            e.printStackTrace();
+            Log.e(TAG, Utilities.getTraceStackInString(e));
         }
     }
 

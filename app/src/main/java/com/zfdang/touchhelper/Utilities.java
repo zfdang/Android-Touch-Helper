@@ -3,6 +3,9 @@ package com.zfdang.touchhelper;
 import android.util.Log;
 import android.view.accessibility.AccessibilityNodeInfo;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 public class Utilities {
     static final String TAG = "Utilities";
 
@@ -16,4 +19,12 @@ public class Utilities {
         }
     }
 
+    static public String getTraceStackInString(Throwable e) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        if(e != null) {
+            e.printStackTrace(pw);
+        }
+        return sw.toString();
+    }
 }
