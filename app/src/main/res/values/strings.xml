@@ -11,4 +11,7 @@
     <string name="button_setting">设置</string>
     <string name="touch_helper_service_label">屏幕助手服务</string>
     <string name="touch_helper_service_description">屏幕助手的无障碍服务，请打开</string>
+    <string name="about_app_introduction">这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。</string>
+    <string name="about_weblink">http://touchhelper.zfdang.com</string>
+    <string name="about_copyright">Copyright © 2020 Zhengfa Dang</string>
 </resources>
