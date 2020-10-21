@@ -5,7 +5,7 @@
     <PreferenceCategory app:title="基本设置">
 
         <CheckBoxPreference
-            app:icon="@drawable/ic_notification_24"
+            app:icon="@drawable/ic_notification"
             app:key="skip_ad_notification"
             app:summaryOff="不显示通知"
             app:summaryOn="显示跳过通知"
@@ -14,21 +14,11 @@
         <SwitchPreferenceCompat
             app:dependency="skip_ad_notification"
             app:key="skip_ad_notification_duration"
+            app:icon="@drawable/ic_access_time_24"
             app:summaryOff="较短"
             app:summaryOn="较长"
             app:title="通知时间" />
 
-        <DropDownPreference
-            app:entries="@array/entries"
-            app:entryValues="@array/entry_values"
-            app:key="dropdown"
-            app:title="tring/title_dropdown_preference"
-            app:useSimpleSummaryProvider="true" />
-
-        <SeekBarPreference
-            app:defaultValue="20"
-            app:key="seekbar"
-            app:title="ring/title_seekbar_preference" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="广告跳过设置">
@@ -36,30 +26,22 @@
         <EditTextPreference
             app:key="setting_key_words"
             app:title="跳过广告按钮的关键字"
+            app:icon="@drawable/ic_target_keywords"
             app:useSimpleSummaryProvider="true"
             app:dialogTitle="设置跳过广告按钮的关键字\n多个关键字请以空格分隔"/>
 
         <Preference
             app:key="setting_whitelist"
+            app:icon="@drawable/ic_whitelist_24"
             app:summary="设置不跳过广告的程序"
             app:title="应用程序白名单" />
 
         <Preference
-            app:key="stylized"
-            app:summary="summary_stylish_preference"
-            app:title="string/title_stylish_preference" />
+            app:key="setting_activity_customization"
+            app:icon="@drawable/ic_circle_target"
+            app:summary="手动添加程序的跳过按钮或者跳过区域"
+            app:title="定制程序的跳过方法" />
 
-        <Preference
-            app:icon="@drawable/ic_nav_home_24"
-            app:key="icon"
-            app:summary="ing/summary_icon_preference"
-            app:title="tring/title_icon_preference" />
-
-        <Preference
-            app:key="single_line_title"
-            app:singleLineTitle="true"
-            app:summary="ng/summary_single_line_title_preference"
-            app:title="/title_single_line_title_preference" />
     </PreferenceCategory>
 
     <PreferenceCategory

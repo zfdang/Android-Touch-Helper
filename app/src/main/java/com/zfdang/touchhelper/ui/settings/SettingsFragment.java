@@ -1,27 +1,39 @@
 package com.zfdang.touchhelper.ui.settings;
 
+import android.accessibilityservice.AccessibilityService;
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.preference.EditTextPreference;
@@ -30,11 +42,16 @@ import androidx.preference.PreferenceFragmentCompat;
 
 import androidx.preference.SwitchPreferenceCompat;
 
+import com.google.gson.Gson;
+import com.zfdang.touchhelper.ActivityPositionDescription;
+import com.zfdang.touchhelper.ActivityWidgetDescription;
 import com.zfdang.touchhelper.R;
 import com.zfdang.touchhelper.Settings;
 import com.zfdang.touchhelper.TouchHelperService;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -50,7 +67,6 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
     Settings mSetting;
 
-
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         setPreferencesFromResource(R.xml.touch_helper_preference, rootKey);
@@ -65,16 +81,8 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     }
 
     private void initPreferences() {
-        SwitchPreferenceCompat toggle = findPreference("toggle_summary");
-        if(toggle != null) {
-            toggle.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-                @Override
-                public boolean onPreferenceClick(Preference preference) {
-                    return false;
-                }
-            });
-        }
 
+        // key words to detect skip-ad button
         EditTextPreference textKeyWords = findPreference("setting_key_words");
         if(textKeyWords != null) {
             textKeyWords.setText(mSetting.getKeyWordsAsString());
@@ -243,6 +251,24 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
             });
         }
+
+        // let user to customize skip-ad button or position for package
+        Preference activity_customization = findPreference("setting_activity_customization");
+        if(activity_customization != null) {
+            activity_customization.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    if(TouchHelperService.serviceImpl != null) {
+                        TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_ACTIVITY_CUSTOMIZATION);
+                    } else {
+                        Toast.makeText(getContext(),"触屏助手未运行，请打开无障碍服务", Toast.LENGTH_SHORT).show();
+                    }
+                    return true;
+                }
+            });
+        }
+
     }
+
 
 }
