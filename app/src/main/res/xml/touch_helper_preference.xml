@@ -32,7 +32,7 @@
 
         <Preference
             app:key="setting_whitelist"
-            app:icon="@drawable/ic_whitelist_24"
+            app:icon="@drawable/ic_happy"
             app:summary="设置不跳过广告的程序"
             app:title="应用程序白名单" />
 

@@ -17,6 +17,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -95,7 +96,7 @@ public class HomeFragment extends Fragment {
 
 
         // set listener for buttons
-        final Button btAppPermission = root.findViewById(R.id.button_app_permission);
+        final ImageButton btAppPermission = root.findViewById(R.id.button_app_permission);
         btAppPermission.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -106,7 +107,7 @@ public class HomeFragment extends Fragment {
             }
         });
 
-        final Button btAccessibilityPermission = root.findViewById(R.id.button_accessibility_permission);
+        final ImageButton btAccessibilityPermission = root.findViewById(R.id.button_accessibility_permission);
         btAccessibilityPermission.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -116,7 +117,7 @@ public class HomeFragment extends Fragment {
             }
         });
 
-        final Button btPowerPermission = root.findViewById(R.id.button_power_permission);
+        final ImageButton btPowerPermission = root.findViewById(R.id.button_power_permission);
         btPowerPermission.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
