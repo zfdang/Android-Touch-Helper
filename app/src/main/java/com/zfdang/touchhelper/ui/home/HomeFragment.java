@@ -48,8 +48,8 @@ public class HomeFragment extends Fragment {
                 ViewModelProviders.of(this).get(HomeViewModel.class);
         View root = inflater.inflate(R.layout.fragment_home, container, false);
 
-        final Drawable drawableYes = ContextCompat.getDrawable(getContext(), R.drawable.ic_yes_24);
-        final Drawable drawableNo = ContextCompat.getDrawable(getContext(), R.drawable.ic_no_24);
+        final Drawable drawableYes = ContextCompat.getDrawable(getContext(), R.drawable.ic_right);
+        final Drawable drawableNo = ContextCompat.getDrawable(getContext(), R.drawable.ic_wrong);
 
         // set observers for widget
         final TextView textView = root.findViewById(R.id.text_instructions);
