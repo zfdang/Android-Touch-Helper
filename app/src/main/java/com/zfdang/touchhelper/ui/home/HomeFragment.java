@@ -103,7 +103,7 @@ public class HomeFragment extends Fragment {
                 Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getActivity().getPackageName()));
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
-                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+//                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
             }
         });
 
@@ -126,14 +126,8 @@ public class HomeFragment extends Fragment {
                     Intent intent = new Intent();
                     String packageName = getActivity().getPackageName();
                     PowerManager pm = (PowerManager) getActivity().getSystemService(Context.POWER_SERVICE);
-                    if (pm.isIgnoringBatteryOptimizations(packageName)) {
-                        // open battery optimization setting page
-                        intent.setAction(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                    } else {
-                        // request ignore settings
-                        intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                        intent.setData(Uri.parse("package:" + packageName));
-                    }
+                    // open battery optimization setting page
+                    intent.setAction(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
                     startActivity(intent);
                 }
             }
