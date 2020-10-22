@@ -505,9 +505,8 @@ public class TouchHelperServiceImpl {
         Log.d(TAG, "updatePackage");
 
         pkgLaunchers = new HashSet<>();
-        Set<String> pkgHomes = new HashSet<>();
-        Set<String> pkgSystems = new HashSet<>();
-        Set<String> pkgTemps = new HashSet<>();
+//        Set<String> pkgHomes = new HashSet<>();
+//        Set<String> pkgTemps = new HashSet<>();
 
         // find all launchers
         Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
@@ -515,34 +514,32 @@ public class TouchHelperServiceImpl {
         for (ResolveInfo e : ResolveInfoList) {
 //            Log.d(TAG, "launcher - " + e.activityInfo.packageName);
             pkgLaunchers.add(e.activityInfo.packageName);
-            if ((e.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == ApplicationInfo.FLAG_SYSTEM) {
-                pkgSystems.add(e.activityInfo.packageName);
-            }
         }
         // find all homes
-        intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
-        ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
-        for (ResolveInfo e : ResolveInfoList) {
-//            Log.d(TAG, "homes - " + e.activityInfo.packageName);
-            pkgHomes.add(e.activityInfo.packageName);
-        }
+//        intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+//        ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
+//        for (ResolveInfo e : ResolveInfoList) {
+////            Log.d(TAG, "homes - " + e.activityInfo.packageName);
+//            pkgHomes.add(e.activityInfo.packageName);
+//        }
         // find all input methods
-        List<InputMethodInfo> inputMethodInfoList = ((InputMethodManager) service.getSystemService(AccessibilityService.INPUT_METHOD_SERVICE)).getInputMethodList();
-        for (InputMethodInfo e : inputMethodInfoList) {
-//            Log.d(TAG, "IME - " + e.getPackageName());
-            pkgTemps.add(e.getPackageName());
-        }
+//        List<InputMethodInfo> inputMethodInfoList = ((InputMethodManager) service.getSystemService(AccessibilityService.INPUT_METHOD_SERVICE)).getInputMethodList();
+//        for (InputMethodInfo e : inputMethodInfoList) {
+////            Log.d(TAG, "IME - " + e.getPackageName());
+//            pkgTemps.add(e.getPackageName());
+//        }
         // add some adhoc packages
-        pkgTemps.add("com.zfdang.touchhelper");
-        pkgTemps.add(packageName);
-        pkgTemps.add("com.android.systemui");
-        pkgTemps.add("com.android.packageinstaller");
+//        pkgTemps.add(packageName);
+//        pkgTemps.add("com.android.systemui");
+//        pkgTemps.add("com.android.packageinstaller");
+//        pkgTemps.add("com.android.settings");
+//        pkgTemps.add("com.android.dialer");
+//        pkgTemps.add("com.android.vending");
 
-        // remove whitelist, system, homes & ad-hoc packagesfrom pkgLaunchers
+        // remove whitelist, systems, homes & ad-hoc packages from pkgLaunchers
         pkgLaunchers.removeAll(pkgWhiteList);
-        pkgLaunchers.removeAll(pkgSystems);
-        pkgLaunchers.removeAll(pkgHomes);
-        pkgLaunchers.removeAll(pkgTemps);
+//        pkgLaunchers.removeAll(pkgHomes);
+//        pkgLaunchers.removeAll(pkgTemps);
         Log.d(TAG, "Working List = " + pkgLaunchers.toString());
     }
 

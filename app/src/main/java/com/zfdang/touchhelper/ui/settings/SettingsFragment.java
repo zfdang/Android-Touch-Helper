@@ -48,6 +48,11 @@ import com.zfdang.touchhelper.ActivityWidgetDescription;
 import com.zfdang.touchhelper.R;
 import com.zfdang.touchhelper.Settings;
 import com.zfdang.touchhelper.TouchHelperService;
+import com.zfdang.touchhelper.Utilities;
+
+import net.sourceforge.pinyin4j.PinyinHelper;
+import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
+import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -113,7 +118,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                     Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
                     List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
                     for (ResolveInfo e : ResolveInfoList) {
-                        Log.d(TAG, "launcher - " + e.activityInfo.packageName);
+//                        Log.d(TAG, "launcher - " + e.activityInfo.packageName);
                         list.add(e.activityInfo.packageName);
                     }
 
@@ -127,9 +132,12 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                             appInfo.isChecked = pkgWhitelist.contains(pkgName);
                             listApp.add(appInfo);
                         } catch (PackageManager.NameNotFoundException e) {
-                            Log.d(TAG, e.getStackTrace().toString());
+                            Log.d(TAG, Utilities.getTraceStackInString(e));
                         }
                     }
+
+                    // sort apps
+                    Collections.sort(listApp);
 
                     // listApp adapter
                     BaseAdapter baseAdapter = new BaseAdapter() {
@@ -221,11 +229,13 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                     // show the dialog
                     dialog.show();
                     return true;
-                }
+                } // public boolean onPreferenceClick(Preference preference) {
 
-                class AppInformation {
+                final HanyuPinyinOutputFormat outputFormat = new HanyuPinyinOutputFormat();
+                class AppInformation implements Comparable{
                     String packageName;
                     String applicationName;
+                    String applicationNamePinyin;
                     Drawable applicationIcon;
                     boolean isChecked;
 
@@ -233,9 +243,30 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                         this.packageName = packageName;
                         this.applicationName = applicationName;
                         this.applicationIcon = applicationIcon;
+                        try {
+                            applicationNamePinyin = PinyinHelper.toHanYuPinyinString(this.applicationName, outputFormat, "", true);
+                        } catch (BadHanyuPinyinOutputFormatCombination badHanyuPinyinOutputFormatCombination) {
+                            applicationNamePinyin = applicationName;
+                            badHanyuPinyinOutputFormatCombination.printStackTrace();
+                        }
                         this.isChecked = false;
                     }
-                }
+
+
+                    @Override
+                    public int compareTo(Object o) {
+                        AppInformation other = (AppInformation) o;
+
+                        if(this.isChecked && !other.isChecked) {
+                            return -11;
+                        } else if (!this.isChecked && other.isChecked) {
+                            return 1;
+                        } else {
+                            //
+                            return this.applicationNamePinyin.compareTo(other.applicationNamePinyin);
+                        }
+                    }
+                } // class AppInformation
 
                 class ViewHolder {
                     TextView textView;
@@ -247,7 +278,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                         imageView = v.findViewById(R.id.img);
                         checkBox = v.findViewById(R.id.check);
                     }
-                }
+                } // class ViewHolder {
 
             });
         }
@@ -269,6 +300,5 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         }
 
     }
-
 
 }

@@ -77,4 +77,7 @@ dependencies {
     // https://developer.android.com/jetpack/androidx/releases/preference?hl=zh-cn
     implementation 'androidx.preference:preference:1.1.1'
 
+    // https://mvnrepository.com/artifact/com.belerweb/pinyin4j
+    implementation group: 'com.belerweb', name: 'pinyin4j', version: '2.5.1'
+
 }
