@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+
     <application
         android:name="com.zfdang.TouchHelperApp"
         android:largeHeap="true"
@@ -15,6 +16,7 @@
         android:label="@string/app_name"
         android:roundIcon="@drawable/ic_touch_helper_icon"
         android:supportsRtl="true"
+        android:persistent="true"
         android:theme="@style/AppTheme">
         <activity
             android:name=".MainActivity"
@@ -43,29 +45,11 @@
             android:enabled="true"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.SCREEN_ON" />
-                <action android:name="android.intent.action.SCREEN_OFF" />
-            </intent-filter>
-            <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_ADDED" />
                 <action android:name="android.intent.action.PACKAGE_REMOVED" />
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>
-<!--        <receiver-->
-<!--            android:name=".MyDeviceAdminReceiver"-->
-<!--            android:description="@string/app_name"-->
-<!--            android:enabled="true"-->
-<!--            android:exported="true"-->
-<!--            android:permission="android.permission.BIND_DEVICE_ADMIN">-->
-<!--            <meta-data-->
-<!--                android:name="android.app.device_admin"-->
-<!--                android:resource="@xml/dcm_configure" />-->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />-->
-<!--            </intent-filter>-->
-<!--        </receiver>-->
-
     </application>
 
 

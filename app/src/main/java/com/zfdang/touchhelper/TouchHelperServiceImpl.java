@@ -1,13 +1,13 @@
 package com.zfdang.touchhelper;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.content.res.Configuration;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -69,22 +69,39 @@ public class TouchHelperServiceImpl {
     private Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
     private Set<ActivityWidgetDescription> setWidgets;
 
-    // show activity customization window
-    private WindowManager windowManager;
-    private WindowManager.LayoutParams aParams, bParams, cParams;
-    private View adv_view, layout_win;
-    private ImageView target_xy;
-
-    ActivityWidgetDescription widgetDescribe;
-    ActivityPositionDescription positionDescribe;
-
-
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
     }
 
     public void onServiceConnected() {
         try {
+            // the following codes are not necessary
+//            // set accessibility configuration
+//            AccessibilityServiceInfo asi = service.getServiceInfo();
+//
+//            // If you only want this service to work with specific applications, set their
+//            // package names here. Otherwise, when the service is activated, it will listen
+//            // to events from all applications.
+//
+//            // Set the type of feedback your service will provide.
+//            asi.feedbackType = AccessibilityServiceInfo.FEEDBACK_ALL_MASK;
+//
+//            // Default services are invoked only if no package-specific ones are present
+//            // for the type of AccessibilityEvent generated. This service *is*
+////            asi.packageNames = new String[] {"com.example.android.myFirstApp", "com.example.android.mySecondApp"};
+//
+//            // application-specific, so the flag isn't necessary. If this was a
+//            // general-purpose service, it would be worth considering setting the
+//            // DEFAULT flag.
+//            asi.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+//                    | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+//                    | AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+//                    | AccessibilityServiceInfo.CAPABILITY_CAN_PERFORM_GESTURES
+//                    | AccessibilityServiceInfo.CAPABILITY_CAN_RETRIEVE_WINDOW_CONTENT;
+//            asi.eventTypes = AccessibilityEvent.TYPES_ALL_MASK;
+//            asi.notificationTimeout = 50;
+//            service.setServiceInfo(asi);
+
             // initialize parameters
             currentPackageName = "Initial PackageName";
             currentActivityName = "Initial ClassName";
@@ -124,6 +141,10 @@ public class TouchHelperServiceImpl {
         }
     }
 
+    public void onInterrupt(){
+        stopSkipAdProcess();
+    }
+
     private void InstallReceiverAndHandler() {
         // install broadcast receiver for package add / remove
         installReceiver = new TouchHelperServiceReceiver();
@@ -132,12 +153,6 @@ public class TouchHelperServiceImpl {
         filter_install.addAction(Intent.ACTION_PACKAGE_REMOVED);
         filter_install.addDataScheme("package");
         service.registerReceiver(installReceiver, filter_install);
-
-        // install broadcast receiver for screen on / off
-        IntentFilter filter_screen = new IntentFilter();
-        filter_screen.addAction(Intent.ACTION_SCREEN_ON);
-        filter_screen.addAction(Intent.ACTION_SCREEN_OFF);
-        service.registerReceiver(installReceiver, filter_screen);
 
         // install handler to handle broadcast messages
         receiverHandler = new Handler(new Handler.Callback() {
@@ -322,9 +337,6 @@ public class TouchHelperServiceImpl {
         }
     }
 
-    public void onConfigurationChanged(Configuration newConfig) {
-        // do nothing here
-    }
 
     public void onUnbind(Intent intent) {
         try {
@@ -534,71 +546,73 @@ public class TouchHelperServiceImpl {
         Log.d(TAG, "Working List = " + pkgLaunchers.toString());
     }
 
+    // display activity customization dialog, and allow users to pick widget or positions
     private void showActivityCustomizationDialog() {
-
-        windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
-
+        // show activity customization window
+        final WindowManager windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
         final DisplayMetrics metrics = new DisplayMetrics();
         windowManager.getDefaultDisplay().getRealMetrics(metrics);
 
-        final boolean b = metrics.heightPixels > metrics.widthPixels;
+        boolean b = metrics.heightPixels > metrics.widthPixels;
         final int width = b ? metrics.widthPixels : metrics.heightPixels;
         final int height = b ? metrics.heightPixels : metrics.widthPixels;
+
+
+        final ActivityWidgetDescription widgetDescription = new ActivityWidgetDescription();
+        final ActivityPositionDescription positionDescription = new ActivityPositionDescription("", "", 0, 0, 500, 500, 1);
+
         final LayoutInflater inflater = LayoutInflater.from(service);
+        // activity customization view
+        final View viewCustomization = inflater.inflate(R.layout.layout_activity_customization, null);
+        final TextView tvPackageName = viewCustomization.findViewById(R.id.tv_package_name);
+        final TextView tvActivityName = viewCustomization.findViewById(R.id.tv_activity_name);
+        final TextView tvWidgetInfo = viewCustomization.findViewById(R.id.tv_widget_info);
+        final TextView tvPositionInfo = viewCustomization.findViewById(R.id.tv_position_info);
+        Button btShowOutline = viewCustomization.findViewById(R.id.button_show_outline);
+        final Button btAddWidget = viewCustomization.findViewById(R.id.button_add_widget);
+        Button btShowTarget = viewCustomization.findViewById(R.id.button_show_target);
+        final Button btAddPosition = viewCustomization.findViewById(R.id.button_add_position);
+        Button btQuit = viewCustomization.findViewById(R.id.button_quit);
 
+        final View viewTarget = inflater.inflate(R.layout.layout_accessibility_node_desc, null);
+        final FrameLayout layoutOverlayOutline = viewTarget.findViewById(R.id.frame);
 
-        widgetDescribe = new ActivityWidgetDescription();
-        positionDescribe = new ActivityPositionDescription("", "", 0, 0, 500, 500, 1);
+        final ImageView imageTarget = new ImageView(service);
+        imageTarget.setImageResource(R.drawable.ic_circle_target);
 
+        // define view positions
+        final WindowManager.LayoutParams customizationParams, outlineParams, targetParams;
+        customizationParams = new WindowManager.LayoutParams();
+        customizationParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
+        customizationParams.format = PixelFormat.TRANSPARENT;
+        customizationParams.gravity = Gravity.START | Gravity.TOP;
+        customizationParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        customizationParams.width = width;
+        customizationParams.height = height / 5;
+        customizationParams.x = (metrics.widthPixels - customizationParams.width) / 2;
+        customizationParams.y = metrics.heightPixels - customizationParams.height;
+        customizationParams.alpha = 0.8f;
 
-        adv_view = inflater.inflate(R.layout.layout_activity_customization, null);
-        final TextView pacName = adv_view.findViewById(R.id.pacName);
-        final TextView actName = adv_view.findViewById(R.id.actName);
-        final TextView widget = adv_view.findViewById(R.id.widget);
-        final TextView xyP = adv_view.findViewById(R.id.xy);
-        Button switchWid = adv_view.findViewById(R.id.switch_wid);
-        final Button saveWidgetButton = adv_view.findViewById(R.id.save_wid);
-        Button switchAim = adv_view.findViewById(R.id.switch_aim);
-        final Button savePositionButton = adv_view.findViewById(R.id.save_aim);
-        Button quitButton = adv_view.findViewById(R.id.quit);
+        outlineParams = new WindowManager.LayoutParams();
+        outlineParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
+        outlineParams.format = PixelFormat.TRANSPARENT;
+        outlineParams.gravity = Gravity.START | Gravity.TOP;
+        outlineParams.width = metrics.widthPixels;
+        outlineParams.height = metrics.heightPixels;
+        outlineParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+        outlineParams.alpha = 0f;
 
-        layout_win = inflater.inflate(R.layout.layout_accessibility_node_desc, null);
-        final FrameLayout layout_add = layout_win.findViewById(R.id.frame);
+        targetParams = new WindowManager.LayoutParams();
+        targetParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
+        targetParams.format = PixelFormat.TRANSPARENT;
+        targetParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+        targetParams.gravity = Gravity.START | Gravity.TOP;
+        targetParams.width = targetParams.height = width / 4;
+        targetParams.x = (metrics.widthPixels - targetParams.width) / 2;
+        targetParams.y = (metrics.heightPixels - targetParams.height) / 2;
+        targetParams.alpha = 0f;
 
-        target_xy = new ImageView(service);
-        target_xy.setImageResource(R.drawable.ic_circle_target);
-
-        aParams = new WindowManager.LayoutParams();
-        aParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
-        aParams.format = PixelFormat.TRANSPARENT;
-        aParams.gravity = Gravity.START | Gravity.TOP;
-        aParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        aParams.width = width;
-        aParams.height = height / 5;
-        aParams.x = (metrics.widthPixels - aParams.width) / 2;
-        aParams.y = metrics.heightPixels - aParams.height;
-        aParams.alpha = 0.8f;
-
-        bParams = new WindowManager.LayoutParams();
-        bParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
-        bParams.format = PixelFormat.TRANSPARENT;
-        bParams.gravity = Gravity.START | Gravity.TOP;
-        bParams.width = metrics.widthPixels;
-        bParams.height = metrics.heightPixels;
-        bParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-        bParams.alpha = 0f;
-
-        cParams = new WindowManager.LayoutParams();
-        cParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
-        cParams.format = PixelFormat.TRANSPARENT;
-        cParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-        cParams.gravity = Gravity.START | Gravity.TOP;
-        cParams.width = cParams.height = width / 4;
-        cParams.x = (metrics.widthPixels - cParams.width) / 2;
-        cParams.y = (metrics.heightPixels - cParams.height) / 2;
-        cParams.alpha = 0f;
-
-        adv_view.setOnTouchListener(new View.OnTouchListener() {
+        viewCustomization.setOnTouchListener(new View.OnTouchListener() {
             int x = 0, y = 0;
 
             @Override
@@ -609,61 +623,61 @@ public class TouchHelperServiceImpl {
                         y = Math.round(event.getRawY());
                         break;
                     case MotionEvent.ACTION_MOVE:
-                        aParams.x = Math.round(aParams.x + (event.getRawX() - x));
-                        aParams.y = Math.round(aParams.y + (event.getRawY() - y));
+                        customizationParams.x = Math.round(customizationParams.x + (event.getRawX() - x));
+                        customizationParams.y = Math.round(customizationParams.y + (event.getRawY() - y));
                         x = Math.round(event.getRawX());
                         y = Math.round(event.getRawY());
-                        windowManager.updateViewLayout(adv_view, aParams);
+                        windowManager.updateViewLayout(viewCustomization, customizationParams);
                         break;
                 }
                 return true;
             }
         });
-        target_xy.setOnTouchListener(new View.OnTouchListener() {
-            int x = 0, y = 0, width = cParams.width / 2, height = cParams.height / 2;
+        imageTarget.setOnTouchListener(new View.OnTouchListener() {
+            int x = 0, y = 0, width = targetParams.width / 2, height = targetParams.height / 2;
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        savePositionButton.setEnabled(true);
-                        cParams.alpha = 0.9f;
-                        windowManager.updateViewLayout(target_xy, cParams);
+                        btAddPosition.setEnabled(true);
+                        targetParams.alpha = 0.9f;
+                        windowManager.updateViewLayout(imageTarget, targetParams);
                         x = Math.round(event.getRawX());
                         y = Math.round(event.getRawY());
                         break;
                     case MotionEvent.ACTION_MOVE:
-                        cParams.x = Math.round(cParams.x + (event.getRawX() - x));
-                        cParams.y = Math.round(cParams.y + (event.getRawY() - y));
+                        targetParams.x = Math.round(targetParams.x + (event.getRawX() - x));
+                        targetParams.y = Math.round(targetParams.y + (event.getRawY() - y));
                         x = Math.round(event.getRawX());
                         y = Math.round(event.getRawY());
-                        windowManager.updateViewLayout(target_xy, cParams);
-                        positionDescribe.packageName = currentPackageName;
-                        positionDescribe.activityName = currentActivityName;
-                        positionDescribe.x = cParams.x + width;
-                        positionDescribe.y = cParams.y + height;
-                        pacName.setText(positionDescribe.packageName);
-                        actName.setText(positionDescribe.activityName);
-                        xyP.setText("X轴：" + positionDescribe.x + "    " + "Y轴：" + positionDescribe.y + "    " + "(其他参数默认)");
+                        windowManager.updateViewLayout(imageTarget, targetParams);
+                        positionDescription.packageName = currentPackageName;
+                        positionDescription.activityName = currentActivityName;
+                        positionDescription.x = targetParams.x + width;
+                        positionDescription.y = targetParams.y + height;
+                        tvPackageName.setText(positionDescription.packageName);
+                        tvActivityName.setText(positionDescription.activityName);
+                        tvPositionInfo.setText("X轴：" + positionDescription.x + "    " + "Y轴：" + positionDescription.y + "    " + "(其他参数默认)");
                         break;
                     case MotionEvent.ACTION_UP:
-                        cParams.alpha = 0.5f;
-                        windowManager.updateViewLayout(target_xy, cParams);
+                        targetParams.alpha = 0.5f;
+                        windowManager.updateViewLayout(imageTarget, targetParams);
                         break;
                 }
                 return true;
             }
         });
-        switchWid.setOnClickListener(new View.OnClickListener() {
+        btShowOutline.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Button button = (Button) v;
-                if (bParams.alpha == 0) {
+                if (outlineParams.alpha == 0) {
                     AccessibilityNodeInfo root = service.getRootInActiveWindow();
                     if (root == null) return;
-                    widgetDescribe.packageName = currentPackageName;
-                    widgetDescribe.activityName = currentActivityName;
-                    layout_add.removeAllViews();
+                    widgetDescription.packageName = currentPackageName;
+                    widgetDescription.activityName = currentActivityName;
+                    layoutOverlayOutline.removeAllViews();
                     ArrayList<AccessibilityNodeInfo> roots = new ArrayList<>();
                     roots.add(root);
                     ArrayList<AccessibilityNodeInfo> nodeList = new ArrayList<>();
@@ -697,106 +711,100 @@ public class TouchHelperServiceImpl {
                             @Override
                             public void onFocusChange(View v, boolean hasFocus) {
                                 if (hasFocus) {
-                                    widgetDescribe.bonus = temRect;
-                                    widgetDescribe.clickable = e.isClickable();
-                                    widgetDescribe.className = e.getClassName().toString();
+                                    widgetDescription.bonus = temRect;
+                                    widgetDescription.clickable = e.isClickable();
+                                    widgetDescription.className = e.getClassName().toString();
                                     CharSequence cId = e.getViewIdResourceName();
-                                    widgetDescribe.idName = cId == null ? "" : cId.toString();
+                                    widgetDescription.idName = cId == null ? "" : cId.toString();
                                     CharSequence cDesc = e.getContentDescription();
-                                    widgetDescribe.describe = cDesc == null ? "" : cDesc.toString();
+                                    widgetDescription.describe = cDesc == null ? "" : cDesc.toString();
                                     CharSequence cText = e.getText();
-                                    widgetDescribe.text = cText == null ? "" : cText.toString();
-                                    saveWidgetButton.setEnabled(true);
-                                    pacName.setText(widgetDescribe.packageName);
-                                    actName.setText(widgetDescribe.activityName);
-                                    widget.setText("click:" + (e.isClickable() ? "true" : "false") + " " + "bonus:" + temRect.toShortString() + " " + "id:" + (cId == null ? "null" : cId.toString().substring(cId.toString().indexOf("id/") + 3)) + " " + "desc:" + (cDesc == null ? "null" : cDesc.toString()) + " " + "text:" + (cText == null ? "null" : cText.toString()));
+                                    widgetDescription.text = cText == null ? "" : cText.toString();
+                                    btAddWidget.setEnabled(true);
+                                    tvPackageName.setText(widgetDescription.packageName);
+                                    tvActivityName.setText(widgetDescription.activityName);
+                                    tvWidgetInfo.setText("click:" + (e.isClickable() ? "true" : "false") + " " + "bonus:" + temRect.toShortString() + " " + "id:" + (cId == null ? "null" : cId.toString().substring(cId.toString().indexOf("id/") + 3)) + " " + "desc:" + (cDesc == null ? "null" : cDesc.toString()) + " " + "text:" + (cText == null ? "null" : cText.toString()));
                                     v.setBackgroundResource(R.drawable.node_focus);
                                 } else {
                                     v.setBackgroundResource(R.drawable.node);
                                 }
                             }
                         });
-                        layout_add.addView(img, params);
+                        layoutOverlayOutline.addView(img, params);
                     }
-                    bParams.alpha = 0.5f;
-                    bParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-                    windowManager.updateViewLayout(layout_win, bParams);
-                    pacName.setText(widgetDescribe.packageName);
-                    actName.setText(widgetDescribe.activityName);
+                    outlineParams.alpha = 0.5f;
+                    outlineParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+                    windowManager.updateViewLayout(viewTarget, outlineParams);
+                    tvPackageName.setText(widgetDescription.packageName);
+                    tvActivityName.setText(widgetDescription.activityName);
                     button.setText("隐藏布局");
                 } else {
-                    bParams.alpha = 0f;
-                    bParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-                    windowManager.updateViewLayout(layout_win, bParams);
-                    saveWidgetButton.setEnabled(false);
+                    outlineParams.alpha = 0f;
+                    outlineParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+                    windowManager.updateViewLayout(viewTarget, outlineParams);
+                    btAddWidget.setEnabled(false);
                     button.setText("显示布局");
                 }
             }
         });
-        switchAim.setOnClickListener(new View.OnClickListener() {
+        btShowTarget.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Button button = (Button) v;
-                if (cParams.alpha == 0) {
-                    positionDescribe.packageName = currentPackageName;
-                    positionDescribe.activityName = currentActivityName;
-                    cParams.alpha = 0.5f;
-                    cParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-                    windowManager.updateViewLayout(target_xy, cParams);
-                    pacName.setText(positionDescribe.packageName);
-                    actName.setText(positionDescribe.activityName);
+                if (targetParams.alpha == 0) {
+                    positionDescription.packageName = currentPackageName;
+                    positionDescription.activityName = currentActivityName;
+                    targetParams.alpha = 0.5f;
+                    targetParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+                    windowManager.updateViewLayout(imageTarget, targetParams);
+                    tvPackageName.setText(positionDescription.packageName);
+                    tvActivityName.setText(positionDescription.activityName);
                     button.setText("隐藏准心");
                 } else {
-                    cParams.alpha = 0f;
-                    cParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-                    windowManager.updateViewLayout(target_xy, cParams);
-                    savePositionButton.setEnabled(false);
+                    targetParams.alpha = 0f;
+                    targetParams.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+                    windowManager.updateViewLayout(imageTarget, targetParams);
+                    btAddPosition.setEnabled(false);
                     button.setText("显示准心");
                 }
             }
         });
-        saveWidgetButton.setOnClickListener(new View.OnClickListener() {
+        btAddWidget.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                ActivityWidgetDescription temWidget = new ActivityWidgetDescription(widgetDescribe);
-                Set<ActivityWidgetDescription> set = mapActivityWidgets.get(widgetDescribe.activityName);
+                ActivityWidgetDescription temWidget = new ActivityWidgetDescription(widgetDescription);
+                Set<ActivityWidgetDescription> set = mapActivityWidgets.get(widgetDescription.activityName);
                 if (set == null) {
                     set = new HashSet<>();
                     set.add(temWidget);
-                    mapActivityWidgets.put(widgetDescribe.activityName, set);
+                    mapActivityWidgets.put(widgetDescription.activityName, set);
                 } else {
                     set.add(temWidget);
                 }
-                saveWidgetButton.setEnabled(false);
-                pacName.setText(widgetDescribe.packageName + " (以下控件数据已保存)");
+                btAddWidget.setEnabled(false);
+                tvPackageName.setText(widgetDescription.packageName + " (以下控件数据已保存)");
             }
         });
-        savePositionButton.setOnClickListener(new View.OnClickListener() {
+        btAddPosition.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mapActivityPositions.put(positionDescribe.activityName, new ActivityPositionDescription(positionDescribe));
-                savePositionButton.setEnabled(false);
-                pacName.setText(positionDescribe.packageName + " (以下坐标数据已保存)");
+                mapActivityPositions.put(positionDescription.activityName, new ActivityPositionDescription(positionDescription));
+                btAddPosition.setEnabled(false);
+                tvPackageName.setText(positionDescription.packageName + " (以下坐标数据已保存)");
             }
         });
-        quitButton.setOnClickListener(new View.OnClickListener() {
+        btQuit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Gson gson = new Gson();
-                windowManager.removeViewImmediate(layout_win);
-                windowManager.removeViewImmediate(adv_view);
-                windowManager.removeViewImmediate(target_xy);
-                layout_win = null;
-                adv_view = null;
-                target_xy = null;
-                aParams = null;
-                bParams = null;
-                cParams = null;
+                windowManager.removeViewImmediate(viewTarget);
+                windowManager.removeViewImmediate(viewCustomization);
+                windowManager.removeViewImmediate(imageTarget);
             }
         });
-        windowManager.addView(layout_win, bParams);
-        windowManager.addView(adv_view, aParams);
-        windowManager.addView(target_xy, cParams);
+        windowManager.addView(viewTarget, outlineParams);
+        windowManager.addView(viewCustomization, customizationParams);
+        windowManager.addView(imageTarget, targetParams);
     }
 
 }

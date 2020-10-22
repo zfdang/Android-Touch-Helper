@@ -11,13 +11,13 @@ public class TouchHelperServiceReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-
         // an Intent broadcast, just dispatch message to TouchHelperService
         String action = intent.getAction();
         Log.d(TAG, action);
-
-        if (TouchHelperService.serviceImpl != null) {
-            TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_STOP_SERVICE);
+        if(action.contains("PACKAGE_ADDED") || action.contains("PACKAGE_REMOVED")) {
+            if (TouchHelperService.serviceImpl != null) {
+                TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_STOP_SERVICE);
+            }
         }
     }
 }
