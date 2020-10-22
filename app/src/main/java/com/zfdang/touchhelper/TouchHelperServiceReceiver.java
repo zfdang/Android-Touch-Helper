@@ -16,7 +16,7 @@ public class TouchHelperServiceReceiver extends BroadcastReceiver {
         Log.d(TAG, action);
         if(action.contains("PACKAGE_ADDED") || action.contains("PACKAGE_REMOVED")) {
             if (TouchHelperService.serviceImpl != null) {
-                TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_STOP_SERVICE);
+                TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_REFRESH_PACKAGE);
             }
         }
     }
