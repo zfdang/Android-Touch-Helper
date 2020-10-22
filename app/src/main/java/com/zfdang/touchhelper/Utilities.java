@@ -2,6 +2,9 @@ package com.zfdang.touchhelper;
 
 import android.util.Log;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Toast;
+
+import com.zfdang.TouchHelperApp;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -27,4 +30,9 @@ public class Utilities {
         }
         return sw.toString();
     }
+
+    public static void toast(CharSequence cs) {
+        Toast.makeText(TouchHelperApp.getAppContext(), cs, Toast.LENGTH_SHORT).show();
+    }
+
 }

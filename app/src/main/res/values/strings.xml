@@ -1,16 +1,16 @@
 <resources>
-    <string name="app_name">屏幕助手</string>
+    <string name="app_name">开屏跳过</string>
     <string name="title_home">状态</string>
     <string name="title_settings">设置</string>
     <string name="title_about">关于</string>
     <string name="status_title">服务状态</string>
-    <string name="text_instructions">请检查如下设置，确保屏幕助手可以正常工作：</string>
+    <string name="text_instructions">请检查如下设置，确保开屏跳过服务可以正常工作：</string>
     <string name="text_app_permission">1. 请在\"应用信息\"里，授予程序\"读写本地存储\"的权限</string>
-    <string name="text_accessibility_permission">2. 请在\"无障碍\"设置里，打开\"屏幕助手服务\"。</string>
-    <string name="text_power_permission">3. 请在\"电池优化\"设置里，设置\"屏幕助手\"为\"不优化\"。</string>
+    <string name="text_accessibility_permission">2. 请在\"无障碍\"设置里，打开\"开屏跳过-无障碍服务\"。</string>
+    <string name="text_power_permission">3. 请在\"电池优化\"设置里，设置\"开屏跳过\"为\"不优化\"。</string>
     <string name="button_setting">设置</string>
-    <string name="touch_helper_service_label">屏幕助手服务</string>
-    <string name="touch_helper_service_description">屏幕助手的无障碍服务，请打开</string>
+    <string name="touch_helper_service_label">开屏跳过-无障碍服务</string>
+    <string name="touch_helper_service_description">开屏跳过的后台服务，请打开</string>
     <string name="about_app_introduction">这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。</string>
     <string name="about_weblink">http://touchhelper.zfdang.com</string>
     <string name="about_copyright">Copyright © 2020 Zhengfa Dang</string>

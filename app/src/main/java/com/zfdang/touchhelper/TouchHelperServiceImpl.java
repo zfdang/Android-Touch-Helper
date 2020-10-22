@@ -2,8 +2,6 @@ package com.zfdang.touchhelper;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
-import android.annotation.SuppressLint;
-import android.content.ComponentName;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
@@ -46,8 +44,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import static android.content.Context.WINDOW_SERVICE;
-
 public class TouchHelperServiceImpl {
 
     private static final String TAG = "TouchHelperServiceImpl";
@@ -62,7 +58,7 @@ public class TouchHelperServiceImpl {
     private ScheduledExecutorService executorService;
     private ScheduledFuture futureExpireSkipAdProcess;
 
-    private boolean b_method_by_known_activity_position, b_method_by_known_activity_widget, b_method_by_button_text;
+    private boolean b_method_by_activity_position, b_method_by_activity_widget, b_method_by_button_keyword;
     private PackageManager packageManager;
     private String currentPackageName, currentActivityName;
     private String packageName;
@@ -211,8 +207,8 @@ public class TouchHelperServiceImpl {
     // 1. TYPE_WINDOW_STATE_CHANGED, 判断packageName和activityName
     // 2. TYPE_WINDOW_CONTENT_CHANGED, 尝试两种方法去跳过广告；如果重复次数超出预设，停止尝试
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName()
-                + " - " + event.getClassName() + "; " + currentPackageName + " - " + currentActivityName);
+//        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName()
+//                + " - " + event.getClassName() + "; " + currentPackageName + " - " + currentActivityName);
         try {
             switch (event.getEventType()) {
                 case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
@@ -229,7 +225,7 @@ public class TouchHelperServiceImpl {
                     boolean isActivity = !actName.startsWith("android.widget.") && !actName.startsWith("android.view.");
 
                     if(currentPackageName.equals(pkgName)) {
-                        // known package, is it an activity?
+                        // current package, is it an activity?
                         if(isActivity) {
                             // yes, it's an activity
                             if(!currentActivityName.equals(actName)) {
@@ -238,10 +234,13 @@ public class TouchHelperServiceImpl {
                                 stopSkipAdProcess();
                                 currentActivityName = actName;
                                 break;
+                            } else {
+                                // same package, same activity, but not the first activity any longer
+                                // do nothing here
                             }
                         }
                     } else {
-                        // new package, is it a new activity?
+                        // new package, is it a activity?
                         if(isActivity) {
                             // yes, it's an activity
                             // since it's an activity in another package, it must be a new activity, save them
@@ -259,17 +258,16 @@ public class TouchHelperServiceImpl {
                     }
 
                     // now to take different methods to skip ads
-                    if (b_method_by_known_activity_position) {
+                    if (b_method_by_activity_position) {
+                        Log.d(TAG, "method by position in STATE_CHANGED");
                         final ActivityPositionDescription activityPositionDescription = mapActivityPositions.get(actName);
                         if (activityPositionDescription != null) {
-                            b_method_by_known_activity_position = false;
-                            b_method_by_button_text = false;
-                            futureExpireSkipAdProcess.cancel(false);
                             // try multiple times to click the position to skip ads
                             executorService.scheduleAtFixedRate(new Runnable() {
                                 int num = 0;
                                 @Override
                                 public void run() {
+                                    Log.d(TAG, "Find skip-ad by position, simulate click " + activityPositionDescription.toString());
                                     if (num < activityPositionDescription.number && currentActivityName.equals(activityPositionDescription.activityName)) {
                                         click(activityPositionDescription.x, activityPositionDescription.y, 0, 20);
                                         num++;
@@ -278,17 +276,25 @@ public class TouchHelperServiceImpl {
                                     }
                                 }
                             }, activityPositionDescription.delay, activityPositionDescription.period, TimeUnit.MILLISECONDS);
+                        } else {
+                            // no customized positions for this activity
+                            b_method_by_activity_position = false;
                         }
                     }
 
-                    if (b_method_by_known_activity_widget) {
+                    if (b_method_by_activity_widget) {
+                        Log.d(TAG, "method by widget in STATE_CHANGED");
                         setWidgets = mapActivityWidgets.get(actName);
                         if(setWidgets != null) {
                             findSkipButtonByWidget(service.getRootInActiveWindow(), setWidgets);
+                        } else {
+                            // no customized widget for this activity
+                            b_method_by_activity_widget = false;
                         }
                     }
 
-                    if (b_method_by_button_text) {
+                    if (b_method_by_button_keyword) {
+                        Log.d(TAG, "method by keywords in STATE_CHANGED");
                         findSkipButtonByText(service.getRootInActiveWindow());
                     }
                     break;
@@ -297,10 +303,14 @@ public class TouchHelperServiceImpl {
                         // do nothing if package name is new
                         break;
                     }
-                    if (b_method_by_known_activity_widget && setWidgets != null) {
+
+                    if (b_method_by_activity_widget && setWidgets != null) {
+                        Log.d(TAG, "method by widget in CONTENT_CHANGED");
                         findSkipButtonByWidget(event.getSource(), setWidgets);
                     }
-                    if (b_method_by_button_text) {
+
+                    if (b_method_by_button_keyword) {
+                        Log.d(TAG, "method by keywords in CONTENT_CHANGED");
                         findSkipButtonByText(event.getSource());
                     }
                     break;
@@ -333,7 +343,7 @@ public class TouchHelperServiceImpl {
             List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText(keyWordList.get(n));
             if (!list.isEmpty()) {
                 for (AccessibilityNodeInfo e : list) {
-                    Log.d(TAG, "Find skip button " + e.toString());
+                    Log.d(TAG, "Find skip-ad by keywords " + e.toString());
 //                    Utilities.printNodeStack(e);
                     if (!e.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                         if (!e.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
@@ -344,7 +354,7 @@ public class TouchHelperServiceImpl {
                     }
                     e.recycle();
                 }
-                b_method_by_button_text = false;
+                b_method_by_button_keyword = false;
                 return;
             }
 
@@ -381,6 +391,7 @@ public class TouchHelperServiceImpl {
                         isFind = true;
                     }
                     if (isFind) {
+                        Log.d(TAG, "Find skip-ad by Widget " + e.toString());
                         if (e.onlyClick) {
                             click(temRect.centerX(), temRect.centerY(), 0, 20);
                         } else {
@@ -443,32 +454,32 @@ public class TouchHelperServiceImpl {
      * 关闭ContentChanged事件的响应
      */
     private void startSkipAdProcess() {
-        b_method_by_known_activity_position = true;
-        b_method_by_known_activity_widget = true;
-        b_method_by_button_text = true;
+        b_method_by_activity_position = true;
+        b_method_by_activity_widget = true;
+        b_method_by_button_keyword = true;
         setWidgets = null;
 
-        // cancel all methods 5 seconds later
+        // cancel all methods 3 seconds later
         if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
             futureExpireSkipAdProcess.cancel(true);
         }
         futureExpireSkipAdProcess = executorService.schedule(new Runnable() {
             @Override
             public void run() {
-                b_method_by_known_activity_position = false;
-                b_method_by_known_activity_widget = false;
-                b_method_by_button_text = false;
+                b_method_by_activity_position = false;
+                b_method_by_activity_widget = false;
+                b_method_by_button_keyword = false;
             }
-        }, 5000, TimeUnit.MILLISECONDS);
+        }, 3000, TimeUnit.MILLISECONDS);
     }
 
     /**
      * 关闭ContentChanged事件的响应
      */
     private void stopSkipAdProcess() {
-        b_method_by_known_activity_position = false;
-        b_method_by_known_activity_widget = false;
-        b_method_by_button_text = false;
+        b_method_by_activity_position = false;
+        b_method_by_activity_widget = false;
+        b_method_by_button_keyword = false;
         setWidgets = null;
         if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
             futureExpireSkipAdProcess.cancel(true);
