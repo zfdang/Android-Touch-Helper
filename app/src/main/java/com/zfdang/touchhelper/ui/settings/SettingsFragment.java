@@ -132,7 +132,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                             appInfo.isChecked = pkgWhitelist.contains(pkgName);
                             listApp.add(appInfo);
                         } catch (PackageManager.NameNotFoundException e) {
-                            Log.d(TAG, Utilities.getTraceStackInString(e));
+                            Log.e(TAG, Utilities.getTraceStackInString(e));
                         }
                     }
 

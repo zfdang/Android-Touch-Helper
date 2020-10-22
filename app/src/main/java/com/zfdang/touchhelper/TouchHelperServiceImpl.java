@@ -161,11 +161,11 @@ public class TouchHelperServiceImpl {
                 switch (msg.what) {
                     case TouchHelperService.ACTION_REFRESH_KEYWORDS:
                         keyWordList = mSetting.getKeyWordList();
-                        Log.d(TAG, keyWordList.toString());
+//                        Log.d(TAG, keyWordList.toString());
                         break;
                     case TouchHelperService.ACTION_REFRESH_PACKAGE:
                         pkgWhiteList = mSetting.getWhitelistPackages();
-                        Log.d(TAG, pkgWhiteList.toString());
+//                        Log.d(TAG, pkgWhiteList.toString());
                         updatePackage();
                         break;
                     case TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY:
@@ -502,7 +502,7 @@ public class TouchHelperServiceImpl {
      * find all packages while launched. also triggered when receive package add / remove events
      */
     private void updatePackage() {
-        Log.d(TAG, "updatePackage");
+//        Log.d(TAG, "updatePackage");
 
         pkgLaunchers = new HashSet<>();
 //        Set<String> pkgHomes = new HashSet<>();
@@ -540,7 +540,7 @@ public class TouchHelperServiceImpl {
         pkgLaunchers.removeAll(pkgWhiteList);
 //        pkgLaunchers.removeAll(pkgHomes);
 //        pkgLaunchers.removeAll(pkgTemps);
-        Log.d(TAG, "Working List = " + pkgLaunchers.toString());
+//        Log.d(TAG, "Working List = " + pkgLaunchers.toString());
     }
 
     // display activity customization dialog, and allow users to pick widget or positions

@@ -120,7 +120,7 @@ public class Settings {
         listKeyWords.clear();
         listKeyWords.addAll(Arrays.asList(keys));
         String json = mJson.toJson(listKeyWords);
-        Log.d(TAG, json);
+//        Log.d(TAG, json);
         mEditor.putString(KEY_WORDS_LIST, json);
         mEditor.apply();
     }
