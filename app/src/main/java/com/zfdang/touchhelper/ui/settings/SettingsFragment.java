@@ -242,13 +242,13 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                     public AppInformation(String packageName, String applicationName, Drawable applicationIcon) {
                         this.packageName = packageName;
                         this.applicationName = applicationName;
-                        this.applicationIcon = applicationIcon;
                         try {
                             applicationNamePinyin = PinyinHelper.toHanYuPinyinString(this.applicationName, outputFormat, "", true);
                         } catch (BadHanyuPinyinOutputFormatCombination badHanyuPinyinOutputFormatCombination) {
                             applicationNamePinyin = applicationName;
-                            badHanyuPinyinOutputFormatCombination.printStackTrace();
+                            Log.e(TAG, Utilities.getTraceStackInString(badHanyuPinyinOutputFormatCombination));
                         }
+                        this.applicationIcon = applicationIcon;
                         this.isChecked = false;
                     }
 
