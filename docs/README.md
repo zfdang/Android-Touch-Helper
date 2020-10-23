@@ -22,14 +22,6 @@
 
 [视频演示](demo.mp4)
 
-![开屏跳过-状态](status.jpeg)
-
-![开屏跳过-设置](setting.jpeg)
-
-![开屏跳过-设置白名单](whitelist.jpeg)
-
-![开屏跳过-增加程序的控件或者位置](add-customization.jpeg)
-
 ## 常见问题
 
 ### 1. 程序无法正常工作？
@@ -52,5 +44,13 @@
 
 请在Github项目页创建Issue:
 
-[Android Touch Helper] (https://github.com/zfdang/Android-Touch-Helper)
+[Android Touch Helper](https://github.com/zfdang/Android-Touch-Helper)
+
+## 感谢
+
+项目借鉴了不少AccessibilityTool的代码，在此表示感谢！
+
+https://github.com/LGH1996/AccessibilityTool
+
+
 
