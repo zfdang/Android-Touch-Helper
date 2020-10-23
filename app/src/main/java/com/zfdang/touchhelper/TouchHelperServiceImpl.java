@@ -227,8 +227,8 @@ public class TouchHelperServiceImpl {
     // 1. TYPE_WINDOW_STATE_CHANGED, 判断packageName和activityName
     // 2. TYPE_WINDOW_CONTENT_CHANGED, 尝试两种方法去跳过广告；如果重复次数超出预设，停止尝试
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName()
-                + " - " + event.getClassName() + "; " + currentPackageName + " - " + currentActivityName);
+//        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName()
+//                + " - " + event.getClassName() + "; " + currentPackageName + " - " + currentActivityName);
         try {
             switch (event.getEventType()) {
                 case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
@@ -547,6 +547,8 @@ public class TouchHelperServiceImpl {
         pkgTemps.add("com.android.systemui");
         pkgTemps.add("com.android.dialer");
         pkgTemps.add("com.android.vending");
+        pkgTemps.add("com.sec.android.app.launcher"); // task manager for samsung
+        pkgTemps.add("com.android.launcher");
 
         // remove whitelist, systems, homes & ad-hoc packages from pkgLaunchers
         pkgLaunchers.removeAll(pkgWhiteList);

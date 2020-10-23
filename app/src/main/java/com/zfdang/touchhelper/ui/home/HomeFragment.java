@@ -52,24 +52,6 @@ public class HomeFragment extends Fragment {
         final Drawable drawableNo = ContextCompat.getDrawable(getContext(), R.drawable.ic_wrong);
 
         // set observers for widget
-        final TextView textView = root.findViewById(R.id.text_instructions);
-        homeViewModel.getText().observe(getViewLifecycleOwner(), new Observer<String>() {
-            @Override
-            public void onChanged(@Nullable String s) {
-                textView.setText(s);
-            }
-        });
-        final ImageView imageAppPermission = root.findViewById(R.id.image_app_permission);
-        homeViewModel.getAppPermission().observe(getViewLifecycleOwner(), new Observer<Boolean>() {
-            @Override
-            public void onChanged(Boolean aBoolean) {
-                if(aBoolean) {
-                    imageAppPermission.setImageDrawable(drawableYes);
-                } else {
-                    imageAppPermission.setImageDrawable(drawableNo);
-                }
-            }
-        });
         final ImageView imageAccessibilityPermission = root.findViewById(R.id.image_accessibility_permission);
         homeViewModel.getAccessibilityPermission().observe(getViewLifecycleOwner(), new Observer<Boolean>() {
             @Override
@@ -96,17 +78,6 @@ public class HomeFragment extends Fragment {
 
 
         // set listener for buttons
-        final ImageButton btAppPermission = root.findViewById(R.id.button_app_permission);
-        btAppPermission.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getActivity().getPackageName()));
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
-//                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
-            }
-        });
-
         final ImageButton btAccessibilityPermission = root.findViewById(R.id.button_accessibility_permission);
         btAccessibilityPermission.setOnClickListener(new View.OnClickListener() {
             @Override
