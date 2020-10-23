@@ -3,6 +3,7 @@ package com.zfdang.touchhelper;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.accessibilityservice.GestureDescription;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
@@ -13,6 +14,7 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -29,6 +31,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.gson.Gson;
 
@@ -171,6 +174,8 @@ public class TouchHelperServiceImpl {
                     case TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY:
                         mapActivityWidgets = mSetting.getActivityWidgets();
                         mapActivityPositions = mSetting.getActivityPositions();
+                        Log.d(TAG, mapActivityWidgets.keySet().toString());
+                        Log.d(TAG, mapActivityPositions.keySet().toString());
                         break;
                     case TouchHelperService.ACTION_STOP_SERVICE:
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -231,7 +236,8 @@ public class TouchHelperServiceImpl {
                     CharSequence tempClassName = event.getClassName();
 
                     if(tempPkgName == null || tempClassName == null) {
-                        // do nothing here
+                        currentPackageName = "initial package";
+                        currentActivityName = "initial activity";
                         break;
                     }
 
@@ -278,7 +284,8 @@ public class TouchHelperServiceImpl {
                         final ActivityPositionDescription activityPositionDescription = mapActivityPositions.get(actName);
                         if (activityPositionDescription != null) {
                             // try multiple times to click the position to skip ads
-                            Log.d(TAG, "Find skip-ad by position, simulate click " + activityPositionDescription.toString());
+                            ShowToastInIntentService("正在根据位置跳过广告...");
+//                            Log.d(TAG, "Find skip-ad by position, simulate click " + activityPositionDescription.toString());
                             executorService.scheduleAtFixedRate(new Runnable() {
                                 int num = 0;
                                 @Override
@@ -301,7 +308,7 @@ public class TouchHelperServiceImpl {
                         Log.d(TAG, "method by widget in STATE_CHANGED");
                         setWidgets = mapActivityWidgets.get(actName);
                         if(setWidgets != null) {
-                            Log.d(TAG, "Find skip-ad by widget, simulate click ");
+//                            Log.d(TAG, "Find skip-ad by widget, simulate click ");
                             findSkipButtonByWidget(service.getRootInActiveWindow(), setWidgets);
                         } else {
                             // no customized widget for this activity
@@ -355,8 +362,9 @@ public class TouchHelperServiceImpl {
         for (int n = 0; n < keyWordList.size(); n++) {
             List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText(keyWordList.get(n));
             if (!list.isEmpty()) {
+                ShowToastInIntentService("正在根据关键字跳过广告...");
                 for (AccessibilityNodeInfo e : list) {
-                    Log.d(TAG, "Find skip-ad by keywords " + e.toString());
+//                    Log.d(TAG, "Find skip-ad by keywords " + e.toString());
 //                    Utilities.printNodeStack(e);
                     if (!e.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                         if (!e.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
@@ -404,7 +412,8 @@ public class TouchHelperServiceImpl {
                         isFind = true;
                     }
                     if (isFind) {
-                        Log.d(TAG, "Find skip-ad by Widget " + e.toString());
+//                        Log.d(TAG, "Find skip-ad by Widget " + e.toString());
+                        ShowToastInIntentService("正在根据控件跳过广告...");
                         if (e.onlyClick) {
                             click(temRect.centerX(), temRect.centerY(), 0, 20);
                         } else {
@@ -809,4 +818,16 @@ public class TouchHelperServiceImpl {
         windowManager.addView(imageTarget, targetParams);
     }
 
+    public void ShowToastInIntentService(final String sText) {
+        final Context myContext = this.service;
+        if(mSetting.isSkipAdNotification()) {
+            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    Toast toast = Toast.makeText(myContext, sText, Toast.LENGTH_SHORT);
+                    toast.show();
+                }
+            });
+        };
+    };
 }

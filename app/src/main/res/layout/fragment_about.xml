@@ -28,6 +28,16 @@
         app:layout_constraintTop_toBottomOf="@+id/textView" />
 
     <TextView
+        android:id="@+id/textView_version"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="TextView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/imageView" />
+
+    <TextView
         android:id="@+id/textView_app_introduction"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -38,15 +48,17 @@
         android:textSize="18sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/imageView" />
+        app:layout_constraintTop_toBottomOf="@+id/textView_version" />
 
     <TextView
         android:id="@+id/textView_weblink"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         android:autoLink="web"
         android:linksClickable="true"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp"
         android:text="@string/about_weblink"
         android:textSize="18sp"
         app:layout_constraintEnd_toEndOf="parent"

@@ -42,7 +42,7 @@ public class Settings {
         mJson = new Gson();
 
         // init all settings from SharedPreferences
-        bSkipAdNotification = mPreference.getBoolean(SKIP_AD_NOTIFICATION, true);
+        bSkipAdNotification = mPreference.getBoolean(SKIP_AD_NOTIFICATION, false);
 
         // init whitelist of packages
         // https://stackoverflow.com/questions/10720028/android-sharedpreferences-not-saving

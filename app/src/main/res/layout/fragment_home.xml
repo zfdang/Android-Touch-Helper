@@ -8,42 +8,20 @@
     tools:context=".ui.home.HomeFragment">
 
     <TextView
-        android:id="@+id/text_status"
-        android:layout_width="0dp"
+        android:id="@+id/text_instructions"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="0dp"
-        android:gravity="center"
-        android:text="@string/status_title"
-        android:textSize="36sp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:text="@string/text_instructions"
+        android:textSize="18sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <ImageView
-        android:id="@+id/imageview_service_status"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
-        android:layout_marginTop="12dp"
-        android:contentDescription="服务状态图标"
-        android:src="@drawable/ic_status_on_24"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/text_status" />
-
-    <TextView
-        android:id="@+id/text_instructions"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="24dp"
-        android:text="@string/text_instructions"
-        android:textSize="20sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/imageview_service_status" />
-
     <TableLayout
+        android:id="@+id/tablelayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
@@ -73,9 +51,9 @@
                     android:id="@+id/text_app_permission"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:textSize="18sp"
+                    android:layout_marginTop="12dp"
                     android:text="@string/text_app_permission"
+                    android:textSize="18sp"
                     app:layout_constraintEnd_toStartOf="@id/guideline_app_permission"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
@@ -85,7 +63,8 @@
                     style="@style/Widget.AppCompat.Button.Small"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="8dp"
                     android:src="@drawable/ic_configuration"
                     android:text="@string/button_setting"
                     app:layout_constraintStart_toStartOf="parent"
@@ -95,10 +74,10 @@
                     android:id="@+id/image_app_permission"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
                     android:src="@drawable/ic_wrong"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="@+id/guideline_app_permission"
+                    app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
@@ -125,7 +104,7 @@
                     android:id="@+id/text_accessibility_permission"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="12dp"
                     android:text="@string/text_accessibility_permission"
                     android:textSize="18sp"
                     app:layout_constraintEnd_toStartOf="@id/guideline_accessibility_permission"
@@ -137,7 +116,8 @@
                     style="@style/Widget.AppCompat.Button.Small"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="8dp"
                     android:src="@drawable/ic_configuration"
                     android:text="@string/button_setting"
                     app:layout_constraintStart_toStartOf="parent"
@@ -147,10 +127,10 @@
                     android:id="@+id/image_accessibility_permission"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
                     android:src="@drawable/ic_wrong"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="@+id/guideline_accessibility_permission"
+                    app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
@@ -177,7 +157,7 @@
                     android:id="@+id/text_power_permission"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="12dp"
                     android:text="@string/text_power_permission"
                     android:textSize="18sp"
                     app:layout_constraintEnd_toStartOf="@id/guideline_power_permission"
@@ -189,7 +169,8 @@
                     style="@style/Widget.AppCompat.Button.Small"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="8dp"
                     android:src="@drawable/ic_configuration"
                     android:text="@string/button_setting"
                     app:layout_constraintStart_toStartOf="parent"
@@ -199,10 +180,41 @@
                     android:id="@+id/image_power_permission"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
                     android:src="@drawable/ic_wrong"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="@+id/guideline_power_permission"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </TableRow>
+
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <androidx.constraintlayout.widget.Guideline
+                    android:id="@+id/guideline_taskmanager"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    app:layout_constraintGuide_percent="0.85" />
+
+                <TextView
+                    android:id="@+id/text_task_manager"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/text_task_manager"
+                    android:textSize="18sp"
+                    app:layout_constraintEnd_toStartOf="@id/guideline_taskmanager"
+                    app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
@@ -210,5 +222,33 @@
         </TableRow>
 
     </TableLayout>
+
+    <TextView
+        android:id="@+id/tv_status_help"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="32dp"
+        android:layout_marginEnd="16dp"
+        android:text="@string/text_status_help"
+        android:textSize="18sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tablelayout" />
+
+    <TextView
+        android:id="@+id/tv_status_weblink"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:autoLink="web"
+        android:text="@string/text_status_weblink"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_status_help" />
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

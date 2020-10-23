@@ -4,7 +4,7 @@ apply plugin: 'com.android.application'
 // use git count as build number, as current date as build version
 def getDate() {
     def date = new Date()
-    def formattedDate = date.format('yy.MM.dd')
+    def formattedDate = date.format('yyyy.MM.dd')
     return formattedDate
 }
 def cmd = 'git rev-list HEAD --count'

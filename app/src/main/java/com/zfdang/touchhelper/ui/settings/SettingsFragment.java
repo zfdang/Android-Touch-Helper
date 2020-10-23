@@ -1,49 +1,33 @@
 package com.zfdang.touchhelper.ui.settings;
 
-import android.accessibilityservice.AccessibilityService;
-import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.graphics.PixelFormat;
-import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Bundle;
-import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
-import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
+import androidx.preference.CheckBoxPreference;
 import androidx.preference.EditTextPreference;
 import androidx.preference.MultiSelectListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
-import androidx.preference.SwitchPreferenceCompat;
-
-import com.google.gson.Gson;
 import com.zfdang.touchhelper.ActivityPositionDescription;
 import com.zfdang.touchhelper.ActivityWidgetDescription;
 import com.zfdang.touchhelper.R;
@@ -55,10 +39,8 @@ import net.sourceforge.pinyin4j.PinyinHelper;
 import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
 import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +57,11 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
     Settings mSetting;
 
+    MultiSelectListPreference activity_positions;
+    MultiSelectListPreference activity_widgets;
+    Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
+    Map<String, ActivityPositionDescription> mapActivityPositions;
+
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         setPreferencesFromResource(R.xml.touch_helper_preference, rootKey);
@@ -89,6 +76,20 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     }
 
     private void initPreferences() {
+
+        CheckBoxPreference notification = findPreference("skip_ad_notification");
+        if(notification != null) {
+            notification.setChecked(mSetting.isSkipAdNotification());
+            notification.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    Boolean value = (Boolean) newValue;
+                    mSetting.setSkipAdNotification(value);
+
+                    return true;
+                }
+            });
+        }
 
         // key words to detect skip-ad button
         EditTextPreference textKeyWords = findPreference("setting_key_words");
@@ -302,27 +303,91 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         }
 
         // manage saved activity widgets
-        MultiSelectListPreference activity_widget = (MultiSelectListPreference) findPreference("setting_activity_widgets");
-        List<String> listWidgets = new ArrayList<>();
-        Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets = Settings.getInstance().getActivityWidgets();
-        for(String key: mapActivityWidgets.keySet()) {
-            listWidgets.add(key);
-        }
-        activity_widget.setEntries(listWidgets.toArray(new CharSequence[listWidgets.size()]));
-        activity_widget.setEntryValues(listWidgets.toArray(new CharSequence[listWidgets.size()]));
+        activity_widgets = (MultiSelectListPreference) findPreference("setting_activity_widgets");
+        mapActivityWidgets = Settings.getInstance().getActivityWidgets();
+        updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
+        activity_widgets.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                HashSet<String> results = (HashSet<String>) newValue;
+                Log.d(TAG, "size " + results.size());
+
+                // update activity widgets
+                Set<String> keys = new HashSet<>(mapActivityWidgets.keySet());
+                for(String key: keys){
+                    if(!results.contains(key)) {
+                        // this key is not selected to keep, remove the entry
+                        mapActivityWidgets.remove(key);
+                    }
+                }
+                Settings.getInstance().setActivityWidgets(mapActivityWidgets);
+
+                // refresh MultiSelectListPreference
+                updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
+
+                // send message to accessibility service
+                if(TouchHelperService.serviceImpl != null) {
+                    TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
+                }
+
+                return true;
+            }
+        });
 
 
         // manage saved activity positions
-        MultiSelectListPreference activity_positions = (MultiSelectListPreference) findPreference("setting_activity_positions");
-        List<String> listPositions = new ArrayList<>();
-        Map<String, ActivityPositionDescription> mapActivityPositions = Settings.getInstance().getActivityPositions();
-        for(String key: mapActivityPositions.keySet()) {
-            listPositions.add(key);
-        }
-        activity_positions.setEntries(listPositions.toArray(new CharSequence[listPositions.size()]));
-        activity_positions.setEntryValues(listPositions.toArray(new CharSequence[listPositions.size()]));
+        activity_positions = (MultiSelectListPreference) findPreference("setting_activity_positions");
+        mapActivityPositions = Settings.getInstance().getActivityPositions();
+        updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
+        activity_positions.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                HashSet<String> results = (HashSet<String>) newValue;
+                Log.d(TAG, "size " + results.size());
+
+                // update activity widgets
+                Set<String> keys = new HashSet<>(mapActivityPositions.keySet());
+                for(String key: keys){
+                    if(!results.contains(key)) {
+                        // this key is not selected to keep, remove the entry
+                        mapActivityPositions.remove(key);
+                    }
+                }
+                Settings.getInstance().setActivityPositions(mapActivityPositions);
+
+                // refresh MultiSelectListPreference
+                updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
+
+                // send message to accessibility service
+                if(TouchHelperService.serviceImpl != null) {
+                    TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
+                }
+
+                return true;
+            }
+        });
 
 
     }
 
+    void updateMultiSelectListPreferenceEntries(MultiSelectListPreference preference, Set<String> keys){
+        if(preference == null || keys == null)
+            return;
+        CharSequence[] entries = keys.toArray(new CharSequence[keys.size()]);
+        preference.setEntries(entries);
+        preference.setEntryValues(entries);
+        preference.setValues(keys);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        // these values might be changed by adding new widget or positions, update entries for these two multipeline
+        mapActivityWidgets = Settings.getInstance().getActivityWidgets();
+        updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
+
+        mapActivityPositions = Settings.getInstance().getActivityPositions();
+        updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
+    }
 }
