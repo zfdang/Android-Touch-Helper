@@ -3,7 +3,7 @@
 ![Build_TouchHelper_APK](https://github.com/zfdang/Android-Touch-Helper/workflows/Build_TouchHelper_APK/badge.svg)
 
 
-开屏跳过 - 安卓系统上的开屏广告自动跳过助手
+开屏跳过 - 安卓系统的开屏广告自动跳过助手
 
 "**开屏跳过**"可以帮助用户自动跳过一些应用的开屏广告，基于Android的无障碍服务实现，开源免广告！
 
@@ -13,11 +13,13 @@
 2. 应用的指定控件。当应用工作时，自动查找对应的控件，如果找到则自动点击；
 3. 应用的指定位置。当应用工作时，自动点击对应的区域。
 
-具体信息请查看网站：
-
-[开屏跳过](http://TouchHelper.zfdang.com)
-
 欢迎大家贡献想法和代码！
+
+# 官方网站
+
+[http://TouchHelper.zfdang.com](http://TouchHelper.zfdang.com)
+
+
 
 
 
