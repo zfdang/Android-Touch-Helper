@@ -36,57 +36,45 @@
             app:summary="设置不跳过广告的程序"
             app:title="应用程序白名单" />
 
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="高级设置">
+
         <Preference
             app:key="setting_activity_customization"
             app:icon="@drawable/ic_circle_target"
             app:summary="手动添加程序的跳过按钮或者跳过区域"
-            app:title="定制程序的跳过方法" />
+            app:title="添加程序的跳过方法" />
 
-    </PreferenceCategory>
+        <MultiSelectListPreference
+            app:key="setting_activity_widgets"
+            app:icon="@drawable/ic_activity_widget"
+            app:title="管理已添加按钮的程序"
+            app:summary="保留或者删除已添加跳过按钮的程序"
+            app:entries="@array/empty_entries"
+            app:entryValues="@array/empty_entries"
+            app:dialogTitle="勾选要保留的程序"/>
 
-    <PreferenceCategory
-        app:initialExpandedChildrenCount="1"
-        app:key="advanced"
-        app:title="高级设置">
+        <MultiSelectListPreference
+            app:key="setting_activity_positions"
+            app:icon="@drawable/ic_activity_position"
+            app:title="管理已添加区域的程序"
+            app:summary="保留或者删除已添加跳过区域的程序"
+            app:entries="@array/empty_entries"
+            app:entryValues="@array/empty_entries"
+            app:dialogTitle="勾选要保留的程序"/>
 
         <Preference
-            app:key="expandable"
-            app:summary="summary_expandable_preference"
-            app:title="title_expandable_preference" />
-
-        <Preference
-            app:summary="summary_intent_preference"
-            app:title="title_intent_preference">
+            app:summary="点击查看使用说明"
+            app:icon="@drawable/ic_manual"
+            app:title="高级设置说明">
 
             <intent
                 android:action="android.intent.action.VIEW"
-                android:data="http://www.android.com" />
+                android:data="https://touchhelper.zfdang.com/settings" />
 
         </Preference>
 
-        <SwitchPreferenceCompat
-            app:key="parent"
-            app:summary="summary_parent_preference"
-            app:title="itle_parent_preference" />
-
-        <SwitchPreferenceCompat
-            app:dependency="parent"
-            app:key="child"
-            app:summary="ary_child_preference"
-            app:title="tle_child_preference" />
-
-        <SwitchPreferenceCompat
-            app:key="toggle_summary"
-            app:summaryOff="y_off_toggle_summary_preference"
-            app:summaryOn="ummary_on_toggle_summary_preference"
-            app:title="_toggle_summary_preference" />
-
-        <Preference
-            app:enableCopying="true"
-            app:key="copyable"
-            app:selectable="false"
-            app:summary="ry_copyable_preference"
-            app:title="copyable_preference" />
     </PreferenceCategory>
 
 </PreferenceScreen>

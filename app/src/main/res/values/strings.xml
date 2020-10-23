@@ -11,7 +11,16 @@
     <string name="button_setting">设置</string>
     <string name="touch_helper_service_label">开屏跳过-无障碍服务</string>
     <string name="touch_helper_service_description">开屏跳过的后台服务，请打开</string>
-    <string name="about_app_introduction">这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。这个程序是一个非常美丽的程序。</string>
+    <string name="about_app_introduction">
+        \"开屏跳过\"可以帮助用户自动跳过一些应用的开屏广告，基于Android的无障碍服务实现。
+        \n\n程序可以使用三种方法跳过开屏广告：
+        \n\n1. 关键字。在应用中查找含有关键字的按钮，如果发现了对应的按钮，自动帮用户点击从而跳过广告；。
+        \n2. 应用的指定控件。当应用工作时，自动查找对应的控件，如果找到则自动点击；
+        \n3. 应用的指定位置。当应用工作时，自动点击对应的区域；
+        \n\n上述三种方法可以在\"设置\"里做具体设置。
+        \n\n详细信息请访问网站:
+    </string>
+
     <string name="about_weblink">http://touchhelper.zfdang.com</string>
     <string name="about_copyright">Copyright © 2020 Zhengfa Dang</string>
 </resources>

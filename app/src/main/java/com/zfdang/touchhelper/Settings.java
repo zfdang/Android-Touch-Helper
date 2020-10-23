@@ -137,7 +137,7 @@ public class Settings {
         mEditor.apply();
     }
 
-    // map of key activity widgets
+    // map of key activity positions
     private static final String ACTIVITY_POSITIONS = "ACTIVITY_POSITIONS";
     private Map<String, ActivityPositionDescription> mapActivityPositions;
     public Map<String, ActivityPositionDescription> getActivityPositions() { return mapActivityPositions; }

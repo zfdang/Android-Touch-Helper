@@ -113,7 +113,7 @@ public class TouchHelperServiceImpl {
 
             // key words
             keyWordList = mSetting.getKeyWordList();
-            Log.d(TAG, keyWordList.toString());
+//            Log.d(TAG, keyWordList.toString());
 
             // whitelist of packages
             pkgWhiteList = mSetting.getWhitelistPackages();
@@ -278,11 +278,11 @@ public class TouchHelperServiceImpl {
                         final ActivityPositionDescription activityPositionDescription = mapActivityPositions.get(actName);
                         if (activityPositionDescription != null) {
                             // try multiple times to click the position to skip ads
+                            Log.d(TAG, "Find skip-ad by position, simulate click " + activityPositionDescription.toString());
                             executorService.scheduleAtFixedRate(new Runnable() {
                                 int num = 0;
                                 @Override
                                 public void run() {
-                                    Log.d(TAG, "Find skip-ad by position, simulate click " + activityPositionDescription.toString());
                                     if (num < activityPositionDescription.number && currentActivityName.equals(activityPositionDescription.activityName)) {
                                         click(activityPositionDescription.x, activityPositionDescription.y, 0, 20);
                                         num++;
@@ -301,6 +301,7 @@ public class TouchHelperServiceImpl {
                         Log.d(TAG, "method by widget in STATE_CHANGED");
                         setWidgets = mapActivityWidgets.get(actName);
                         if(setWidgets != null) {
+                            Log.d(TAG, "Find skip-ad by widget, simulate click ");
                             findSkipButtonByWidget(service.getRootInActiveWindow(), setWidgets);
                         } else {
                             // no customized widget for this activity
@@ -780,6 +781,8 @@ public class TouchHelperServiceImpl {
                 }
                 btAddWidget.setEnabled(false);
                 tvPackageName.setText(widgetDescription.packageName + " (以下控件数据已保存)");
+                // save
+                Settings.getInstance().setActivityWidgets(mapActivityWidgets);
             }
         });
         btAddPosition.setOnClickListener(new View.OnClickListener() {
@@ -788,6 +791,8 @@ public class TouchHelperServiceImpl {
                 mapActivityPositions.put(positionDescription.activityName, new ActivityPositionDescription(positionDescription));
                 btAddPosition.setEnabled(false);
                 tvPackageName.setText(positionDescription.packageName + " (以下坐标数据已保存)");
+                // save
+                Settings.getInstance().setActivityPositions(mapActivityPositions);
             }
         });
         btQuit.setOnClickListener(new View.OnClickListener() {

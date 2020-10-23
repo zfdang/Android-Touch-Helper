@@ -37,6 +37,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.preference.EditTextPreference;
+import androidx.preference.MultiSelectListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
@@ -54,11 +55,13 @@ import net.sourceforge.pinyin4j.PinyinHelper;
 import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
 import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static android.content.Context.WINDOW_SERVICE;
@@ -252,7 +255,6 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                         this.isChecked = false;
                     }
 
-
                     @Override
                     public int compareTo(Object o) {
                         AppInformation other = (AppInformation) o;
@@ -298,6 +300,28 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                 }
             });
         }
+
+        // manage saved activity widgets
+        MultiSelectListPreference activity_widget = (MultiSelectListPreference) findPreference("setting_activity_widgets");
+        List<String> listWidgets = new ArrayList<>();
+        Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets = Settings.getInstance().getActivityWidgets();
+        for(String key: mapActivityWidgets.keySet()) {
+            listWidgets.add(key);
+        }
+        activity_widget.setEntries(listWidgets.toArray(new CharSequence[listWidgets.size()]));
+        activity_widget.setEntryValues(listWidgets.toArray(new CharSequence[listWidgets.size()]));
+
+
+        // manage saved activity positions
+        MultiSelectListPreference activity_positions = (MultiSelectListPreference) findPreference("setting_activity_positions");
+        List<String> listPositions = new ArrayList<>();
+        Map<String, ActivityPositionDescription> mapActivityPositions = Settings.getInstance().getActivityPositions();
+        for(String key: mapActivityPositions.keySet()) {
+            listPositions.add(key);
+        }
+        activity_positions.setEntries(listPositions.toArray(new CharSequence[listPositions.size()]));
+        activity_positions.setEntryValues(listPositions.toArray(new CharSequence[listPositions.size()]));
+
 
     }
 
