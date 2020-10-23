@@ -1,4 +1,5 @@
-## 欢迎使用触屏助手-开屏广告自动跳过
+## 开屏跳过
+### 安卓手机的开屏广告自动跳过助手
 
 You can use the [editor on GitHub](https://github.com/zfdang/Android-Touch-Helper/edit/master/docs/README.md) to maintain and preview the content for your website in Markdown files.
 
