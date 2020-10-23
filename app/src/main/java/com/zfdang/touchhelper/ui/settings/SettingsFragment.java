@@ -310,7 +310,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
                 HashSet<String> results = (HashSet<String>) newValue;
-                Log.d(TAG, "size " + results.size());
+//                Log.d(TAG, "size " + results.size());
 
                 // update activity widgets
                 Set<String> keys = new HashSet<>(mapActivityWidgets.keySet());
@@ -343,7 +343,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
                 HashSet<String> results = (HashSet<String>) newValue;
-                Log.d(TAG, "size " + results.size());
+//                Log.d(TAG, "size " + results.size());
 
                 // update activity widgets
                 Set<String> keys = new HashSet<>(mapActivityPositions.keySet());

@@ -174,8 +174,8 @@ public class TouchHelperServiceImpl {
                     case TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY:
                         mapActivityWidgets = mSetting.getActivityWidgets();
                         mapActivityPositions = mSetting.getActivityPositions();
-                        Log.d(TAG, mapActivityWidgets.keySet().toString());
-                        Log.d(TAG, mapActivityPositions.keySet().toString());
+//                        Log.d(TAG, mapActivityWidgets.keySet().toString());
+//                        Log.d(TAG, mapActivityPositions.keySet().toString());
                         break;
                     case TouchHelperService.ACTION_STOP_SERVICE:
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -252,7 +252,8 @@ public class TouchHelperServiceImpl {
                             if(!currentActivityName.equals(actName)) {
                                 // new activity in the package, this means this activity is not the first activity any more
                                 // stop skip ad process
-                                stopSkipAdProcess();
+                                // there are some cases that ad-activity is not the first activity in the package
+//                                stopSkipAdProcess();
                                 currentActivityName = actName;
                                 break;
                             } else {
@@ -280,7 +281,7 @@ public class TouchHelperServiceImpl {
 
                     // now to take different methods to skip ads
                     if (b_method_by_activity_position) {
-                        Log.d(TAG, "method by position in STATE_CHANGED");
+//                        Log.d(TAG, "method by position in STATE_CHANGED");
                         final ActivityPositionDescription activityPositionDescription = mapActivityPositions.get(actName);
                         if (activityPositionDescription != null) {
                             // try multiple times to click the position to skip ads
@@ -305,7 +306,7 @@ public class TouchHelperServiceImpl {
                     }
 
                     if (b_method_by_activity_widget) {
-                        Log.d(TAG, "method by widget in STATE_CHANGED");
+//                        Log.d(TAG, "method by widget in STATE_CHANGED");
                         setWidgets = mapActivityWidgets.get(actName);
                         if(setWidgets != null) {
 //                            Log.d(TAG, "Find skip-ad by widget, simulate click ");
@@ -317,7 +318,7 @@ public class TouchHelperServiceImpl {
                     }
 
                     if (b_method_by_button_keyword) {
-                        Log.d(TAG, "method by keywords in STATE_CHANGED");
+//                        Log.d(TAG, "method by keywords in STATE_CHANGED");
                         findSkipButtonByText(service.getRootInActiveWindow());
                     }
                     break;
@@ -328,12 +329,12 @@ public class TouchHelperServiceImpl {
                     }
 
                     if (b_method_by_activity_widget && setWidgets != null) {
-                        Log.d(TAG, "method by widget in CONTENT_CHANGED");
+//                        Log.d(TAG, "method by widget in CONTENT_CHANGED");
                         findSkipButtonByWidget(event.getSource(), setWidgets);
                     }
 
                     if (b_method_by_button_keyword) {
-                        Log.d(TAG, "method by keywords in CONTENT_CHANGED");
+//                        Log.d(TAG, "method by keywords in CONTENT_CHANGED");
                         findSkipButtonByText(event.getSource());
                     }
                     break;
@@ -481,7 +482,7 @@ public class TouchHelperServiceImpl {
         b_method_by_button_keyword = true;
         setWidgets = null;
 
-        // cancel all methods 3 seconds later
+        // cancel all methods 5 seconds later
         if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
             futureExpireSkipAdProcess.cancel(true);
         }
@@ -492,7 +493,7 @@ public class TouchHelperServiceImpl {
                 b_method_by_activity_widget = false;
                 b_method_by_button_keyword = false;
             }
-        }, 3000, TimeUnit.MILLISECONDS);
+        }, 5000, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -516,7 +517,7 @@ public class TouchHelperServiceImpl {
 
         pkgLaunchers = new HashSet<>();
 //        Set<String> pkgHomes = new HashSet<>();
-//        Set<String> pkgTemps = new HashSet<>();
+        Set<String> pkgTemps = new HashSet<>();
 
         // find all launchers
         Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
@@ -539,7 +540,7 @@ public class TouchHelperServiceImpl {
 //            pkgTemps.add(e.getPackageName());
 //        }
         // add some adhoc packages
-//        pkgTemps.add(packageName);
+        pkgTemps.add(packageName);
 //        pkgTemps.add("com.android.systemui");
 //        pkgTemps.add("com.android.packageinstaller");
 //        pkgTemps.add("com.android.settings");
@@ -549,7 +550,7 @@ public class TouchHelperServiceImpl {
         // remove whitelist, systems, homes & ad-hoc packages from pkgLaunchers
         pkgLaunchers.removeAll(pkgWhiteList);
 //        pkgLaunchers.removeAll(pkgHomes);
-//        pkgLaunchers.removeAll(pkgTemps);
+        pkgLaunchers.removeAll(pkgTemps);
 //        Log.d(TAG, "Working List = " + pkgLaunchers.toString());
     }
 

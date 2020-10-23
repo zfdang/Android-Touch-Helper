@@ -42,7 +42,7 @@ public class Settings {
         mJson = new Gson();
 
         // init all settings from SharedPreferences
-        bSkipAdNotification = mPreference.getBoolean(SKIP_AD_NOTIFICATION, false);
+        bSkipAdNotification = mPreference.getBoolean(SKIP_AD_NOTIFICATION, true);
 
         // init whitelist of packages
         // https://stackoverflow.com/questions/10720028/android-sharedpreferences-not-saving
@@ -132,7 +132,7 @@ public class Settings {
     public void setActivityWidgets(Map<String, Set<ActivityWidgetDescription>> map) {
         mapActivityWidgets = map;
         String json = mJson.toJson(mapActivityWidgets);
-        Log.d(TAG, json);
+//        Log.d(TAG, json);
         mEditor.putString(ACTIVITY_WIDGETS, json);
         mEditor.apply();
     }
@@ -144,7 +144,7 @@ public class Settings {
     public void setActivityPositions(Map<String, ActivityPositionDescription> map) {
         mapActivityPositions = map;
         String json = mJson.toJson(mapActivityPositions);
-        Log.d(TAG, json);
+//        Log.d(TAG, json);
         mEditor.putString(ACTIVITY_POSITIONS, json);
         mEditor.apply();
     }

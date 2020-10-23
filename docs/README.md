@@ -1,37 +1,56 @@
-## 开屏跳过 - 安卓系统的开屏广告自动跳过助手
+## 功能介绍
 
-You can use the [editor on GitHub](https://github.com/zfdang/Android-Touch-Helper/edit/master/docs/README.md) to maintain and preview the content for your website in Markdown files.
+"**开屏跳过**"可以帮助用户自动跳过一些应用的开屏广告，基于Android的无障碍服务实现。
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+程序可以使用三种方法跳过开屏广告：
 
-### Markdown
+1. 关键字。在应用中查找含有关键字的按钮，如果发现了对应的按钮，自动帮用户点击从而跳过广告。
+2. 应用的指定控件。当应用工作时，自动查找对应的控件，如果找到则自动点击；
+3. 应用的指定位置。当应用工作时，自动点击对应的区域。
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+上述三种方法可以在"设置"里做具体设置。
 
-```markdown
-Syntax highlighted code block
+**本程序是开源程序，不会收集或者上传任何个人信息！请放心使用！**
 
-# Header 1
-## Header 2
-### Header 3
+## 下载程序
 
-- Bulleted
-- List
+1. Github自动编译结果: [自动编译结果](https://github.com/zfdang/Android-Touch-Helper/releases)
 
-1. Numbered
-2. List
+2. 当前发布的最新版本：[当前版本](/TouchHelper-release-v2020.10.23.apk)
 
-**Bold** and _Italic_ and `Code` text
+## 程序截图和演示
 
-[Link](url) and ![Image](src)
-```
+[视频演示](demo.mp4)
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
+![开屏跳过-状态](status.jpeg)
 
-### Jekyll Themes
+![开屏跳过-设置](setting.jpeg)
 
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/zfdang/Android-Touch-Helper/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
+![开屏跳过-设置白名单](whitelist.jpeg)
 
-### Support or Contact
+![开屏跳过-增加程序的控件或者位置](add-customization.jpeg)
 
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+## 常见问题
+
+### 1. 程序无法正常工作？
+
+因为程序需要始终在后台运行，所以需要适当的设置，才能让程序正常工作。
+
+点击这里查看具体的解决方法：
+
+[设置程序](/enable)
+
+### 2. 跳过广告的高级设置
+
+除了关键字外，程序支持对一些特殊的应用，指定控件或者位置，然后程序会自动点击对应的控件或者位置，帮助用户实现某些目标。
+
+点击这里查看具体的设置方法：
+
+[广告跳过高级设置](/settings)
+
+## Support or Contact
+
+请在Github项目页创建Issue:
+
+[Android Touch Helper] (https://github.com/zfdang/Android-Touch-Helper)
+
