@@ -542,14 +542,9 @@ public class TouchHelperServiceImpl {
         // add some adhoc packages
         // https://support.google.com/a/answer/7292363?hl=en
         pkgTemps.add(packageName);
-        pkgTemps.add("com.android.phone");
         pkgTemps.add("com.android.settings");
-        pkgTemps.add("com.android.systemui");
-        pkgTemps.add("com.android.dialer");
-        pkgTemps.add("com.android.vending");
-        pkgTemps.add("com.sec.android.app.launcher"); // task manager for samsung
-        pkgTemps.add("com.android.launcher");
-
+        pkgTemps.add("com.sec.android.app.launcher");
+        
         // remove whitelist, systems, homes & ad-hoc packages from pkgLaunchers
         pkgLaunchers.removeAll(pkgWhiteList);
 //        pkgLaunchers.removeAll(pkgHomes);
