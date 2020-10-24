@@ -42,7 +42,7 @@
 
         <Preference
             app:key="setting_activity_customization"
-            app:icon="@drawable/ic_circle_target"
+            app:icon="@drawable/ic_target"
             app:summary="手动添加程序的跳过按钮或者跳过区域"
             app:title="添加程序的跳过方法" />
 

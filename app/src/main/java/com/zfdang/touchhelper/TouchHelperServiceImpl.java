@@ -591,7 +591,7 @@ public class TouchHelperServiceImpl {
         final FrameLayout layoutOverlayOutline = viewTarget.findViewById(R.id.frame);
 
         final ImageView imageTarget = new ImageView(service);
-        imageTarget.setImageResource(R.drawable.ic_circle_target);
+        imageTarget.setImageResource(R.drawable.ic_target);
 
         // define view positions
         final WindowManager.LayoutParams customizationParams, outlineParams, targetParams;
