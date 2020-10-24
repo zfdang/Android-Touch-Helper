@@ -547,11 +547,10 @@ public class TouchHelperServiceImpl {
 ////            Log.d(TAG, "IME - " + e.getPackageName());
 //            pkgTemps.add(e.getPackageName());
 //        }
-        // add some adhoc packages
+        // ignore some hardcoded packages
         // https://support.google.com/a/answer/7292363?hl=en
         pkgTemps.add(packageName);
         pkgTemps.add("com.android.settings");
-        pkgTemps.add("com.sec.android.app.launcher");
 
         // remove whitelist, systems, homes & ad-hoc packages from pkgLaunchers
         pkgLaunchers.removeAll(pkgWhiteList);

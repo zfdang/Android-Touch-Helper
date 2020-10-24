@@ -1,7 +1,11 @@
 package com.zfdang.touchhelper;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.util.Log;
 
 import com.google.gson.Gson;
@@ -44,10 +48,22 @@ public class Settings {
         // init all settings from SharedPreferences
         bSkipAdNotification = mPreference.getBoolean(SKIP_AD_NOTIFICATION, true);
 
+
+        // find all system packages, and set them as default value for whitelist
+        PackageManager packageManager = TouchHelperApp.getAppContext().getPackageManager();
+        Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
+        Set<String> pkgSystems = new HashSet<>();
+        for (ResolveInfo e : ResolveInfoList) {
+            if ((e.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == ApplicationInfo.FLAG_SYSTEM) {
+                pkgSystems.add(e.activityInfo.packageName);
+            }
+        }
+
         // init whitelist of packages
         // https://stackoverflow.com/questions/10720028/android-sharedpreferences-not-saving
         // Note that you must not modify the set instance returned by this call. The consistency of the stored data is not guaranteed if you do, nor is your ability to modify the instance at all.
-        setWhiteListPackages = new HashSet<String>(mPreference.getStringSet(WHITELIST_PACKAGE, new HashSet<String>()));
+        setWhiteListPackages = new HashSet<String>(mPreference.getStringSet(WHITELIST_PACKAGE, pkgSystems));
 
         // init key words
         String json = mPreference.getString(KEY_WORDS_LIST, null);
