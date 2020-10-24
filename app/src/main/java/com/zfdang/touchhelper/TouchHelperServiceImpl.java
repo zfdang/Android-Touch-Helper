@@ -361,19 +361,27 @@ public class TouchHelperServiceImpl {
     private void findSkipButtonByText(AccessibilityNodeInfo nodeInfo) {
         if (nodeInfo == null) return;
         for (int n = 0; n < keyWordList.size(); n++) {
-            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText(keyWordList.get(n));
+            String keyword = keyWordList.get(n);
+            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText(keyword);
             if (!list.isEmpty()) {
-                ShowToastInIntentService("正在根据关键字跳过广告...");
                 for (AccessibilityNodeInfo e : list) {
-//                    Log.d(TAG, "Find skip-ad by keywords " + e.toString());
+//                    Log.d(TAG, "Find skip-ad by keywords " + e.toString() + " label size = ");
 //                    Utilities.printNodeStack(e);
-                    if (!e.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                        if (!e.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                            Rect rect = new Rect();
-                            e.getBoundsInScreen(rect);
-                            click(rect.centerX(), rect.centerY(), 0, 20);
+                    // add more validation about the node: 找到的按钮，不能比关键字的长度超出太多
+                    String label = e.getText().toString();
+                    if(label != null && label.length() <= keyword.length() + 4){
+//                        Log.d(TAG, "label = " + label + " keyword = " + keyword);
+                        ShowToastInIntentService("正在根据关键字跳过广告...");
+
+                        if (!e.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                            if (!e.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                                Rect rect = new Rect();
+                                e.getBoundsInScreen(rect);
+                                click(rect.centerX(), rect.centerY(), 0, 20);
+                            }
                         }
                     }
+
                     e.recycle();
                 }
                 b_method_by_button_keyword = false;
@@ -544,7 +552,7 @@ public class TouchHelperServiceImpl {
         pkgTemps.add(packageName);
         pkgTemps.add("com.android.settings");
         pkgTemps.add("com.sec.android.app.launcher");
-        
+
         // remove whitelist, systems, homes & ad-hoc packages from pkgLaunchers
         pkgLaunchers.removeAll(pkgWhiteList);
 //        pkgLaunchers.removeAll(pkgHomes);
