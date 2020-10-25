@@ -6,6 +6,12 @@
 <img src="touch_helper.png" width="200">
 </p>
 
+使用广告跳过程序，最大的风险是个人信息被泄露。因为这种软件都需要开启Accessibility“无障碍服务”，可以获取屏幕上的任何内容，从而可以检测广告，帮助用户自动跳过。
+
+**本程序是开源程序，不需要网络权限，不需要存储权限，不会收集或者上传任何信息！绝无隐私问题！**
+
+**如果对网站提供的编译好的版本有担忧，可以安装Github Workflow自动编译和发布的版本**
+
 ## 功能介绍
 
 "**开屏跳过**"可以帮助用户自动跳过一些应用的开屏广告，基于Android的无障碍服务实现。
@@ -16,9 +22,8 @@
 2. 应用里指定的控件。当应用工作时，自动查找对应的控件，如果找到则自动点击；
 3. 应用里指定的位置。当应用工作时，自动点击对应的区域。
 
-上述三种方法可以在"设置"里做具体设置。
+上述三种方法可以在"设置"里做进一步配置。
 
-**本程序是开源程序，不需要网络权限，不需要存储权限，不会收集或者上传任何个人信息！请放心使用！**
 
 ## 下载程序
 
@@ -28,7 +33,7 @@
 2. 从本网站下载：[v2020.10.24](TouchHelper-release-v2020.10.24.apk)
 3. Google Play Store: [开屏跳过](https://play.google.com/store/apps/details?id=com.zfdang.touchhelper)
 
-## 支持作者:
+## 支持作者
 
 <p>
 <img src="alipay5.jpeg" width="250">
@@ -36,9 +41,13 @@
 <img src="wechatpay.jpeg" width="250">
 </p>
 
-## 程序截图和演示
+## 程序演示和截图
 
 [视频演示](demo.mp4)
+
+[Youtube](https://www.youtube.com/watch?v=_Ko-HM7sFps)
+
+### 截图
 
 <p>
 <img src="status.jpeg" width="200">
