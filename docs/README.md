@@ -43,19 +43,19 @@
 
 ## 程序演示和截图
 
-[视频演示](demo.mp4)
+[视频演示](touch_helper.mp4)
 
 [Youtube](https://www.youtube.com/watch?v=_Ko-HM7sFps)
 
 ### 截图
 
 <p>
-<img src="status.jpeg" width="200">
-<img src="settings.jpeg" width="200">
-<img src="keyword.jpeg" width="200">
-<img src="whitelist.jpeg" width="200">
-<img src="customization.jpeg" width="200">
-<img src="about.jpeg" width="200">
+<img src="images/status.jpeg" width="200">
+<img src="images/settings.jpeg" width="200">
+<img src="images/keyword.jpeg" width="200">
+<img src="images/whitelist.jpeg" width="200">
+<img src="images/customization.jpeg" width="200">
+<img src="images/about.jpeg" width="200">
 </p>
 
 ## 常见问题
