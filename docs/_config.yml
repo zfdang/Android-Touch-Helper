@@ -1,1 +1,8 @@
 theme: jekyll-theme-cayman
+title: 开屏跳过
+description: 安卓系统的开屏广告自动跳过助手
+show_downloads: true
+google_analytics: 
+github:
+  zip_url: https://github.com/zfdang/Android-Touch-Helper/releases
+  another_url: another values
