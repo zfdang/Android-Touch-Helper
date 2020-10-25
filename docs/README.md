@@ -57,17 +57,12 @@
 
 [广告跳过高级设置](/settings)
 
-## Support or Contact
+## 发现问题？
 
 请在Github项目页创建Issue:
 
 [Android Touch Helper](https://github.com/zfdang/Android-Touch-Helper)
 
-## 感谢
-
-项目借鉴了不少AccessibilityTool的代码，在此表示感谢！
-
-https://github.com/LGH1996/AccessibilityTool
 
 
 

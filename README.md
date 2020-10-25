@@ -15,12 +15,16 @@
 
 欢迎大家贡献想法和代码！
 
-# 官方网站
+# 项目网站
 
 [http://TouchHelper.zfdang.com](http://TouchHelper.zfdang.com)
 
 
+# 感谢
 
+项目借鉴了不少AccessibilityTool的代码，在此表示感谢！
+
+https://github.com/LGH1996/AccessibilityTool
 
 
 
