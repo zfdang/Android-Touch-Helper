@@ -30,7 +30,7 @@
 发布顺序由快到慢：
 
 1. Github自动编译结果: [自动编译结果](https://github.com/zfdang/Android-Touch-Helper/releases)
-2. 从本网站下载：[v2020.10.24](TouchHelper-release-v2020.10.24.apk)
+2. 从本网站下载：[v2020.10.25](TouchHelper-release-v2020.10.25.apk)
 3. Google Play Store: [开屏跳过](https://play.google.com/store/apps/details?id=com.zfdang.touchhelper)
 
 ## 支持作者
