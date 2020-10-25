@@ -18,6 +18,14 @@
 
 2. 当前发布的最新版本：[当前版本](TouchHelper-release-v2020.10.24.apk)
 
+#### 支持作者:
+
+<p>
+<img src="alipay5.jpeg" width="250">
+<img src="alipay10.jpeg" width="250">
+<img src="wechatpay.jpeg" width="250">
+</p>
+
 ## 程序截图和演示
 
 [视频演示](demo.mp4)
