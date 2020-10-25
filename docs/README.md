@@ -22,6 +22,15 @@
 
 [视频演示](demo.mp4)
 
+<p>
+<img src="status.jpeg" width="200">
+<img src="settings.jpeg" width="200">
+<img src="keyword.jpeg" width="200">
+<img src="whitelist.jpeg" width="200">
+<img src="customization.jpeg" width="200">
+<img src="about.jpeg" width="200">
+</p>
+
 ## 常见问题
 
 ### 1. 程序无法正常工作？
