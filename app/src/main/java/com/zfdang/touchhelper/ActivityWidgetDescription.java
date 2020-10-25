@@ -5,8 +5,8 @@ import android.graphics.Rect;
 import java.util.Objects;
 
 public class ActivityWidgetDescription {
-    public String packageName, activityName, className, idName, describe, text;
-    public Rect bonus;
+    public String packageName, activityName, className, idName, description, text;
+    public Rect position;
     public boolean clickable, onlyClick;
 
     public ActivityWidgetDescription() {
@@ -14,35 +14,35 @@ public class ActivityWidgetDescription {
         this.activityName = "";
         this.className = "";
         this.idName = "";
-        this.describe = "";
+        this.description = "";
         this.text = "";
-        this.bonus = new Rect();
+        this.position = new Rect();
         this.clickable = false;
         this.onlyClick = false;
     }
 
-    public ActivityWidgetDescription(String packageName, String activityName, String className, String idName, String describe, String text, Rect bonus, boolean clickable, boolean onlyClick) {
+    public ActivityWidgetDescription(String packageName, String activityName, String className, String idName, String description, String text, Rect position, boolean clickable, boolean onlyClick) {
         this.packageName = packageName;
         this.activityName = activityName;
         this.className = className;
         this.idName = idName;
-        this.describe = describe;
+        this.description = description;
         this.text = text;
-        this.bonus = bonus;
+        this.position = position;
         this.clickable = clickable;
         this.onlyClick = onlyClick;
     }
 
-    public ActivityWidgetDescription(ActivityWidgetDescription widgetDescribe) {
-        this.packageName = widgetDescribe.packageName;
-        this.activityName = widgetDescribe.activityName;
-        this.className = widgetDescribe.className;
-        this.idName = widgetDescribe.idName;
-        this.describe = widgetDescribe.describe;
-        this.text = widgetDescribe.text;
-        this.bonus = new Rect(widgetDescribe.bonus);
-        this.clickable = widgetDescribe.clickable;
-        this.onlyClick = widgetDescribe.onlyClick;
+    public ActivityWidgetDescription(ActivityWidgetDescription widgetDescription) {
+        this.packageName = widgetDescription.packageName;
+        this.activityName = widgetDescription.activityName;
+        this.className = widgetDescription.className;
+        this.idName = widgetDescription.idName;
+        this.description = widgetDescription.description;
+        this.text = widgetDescription.text;
+        this.position = new Rect(widgetDescription.position);
+        this.clickable = widgetDescription.clickable;
+        this.onlyClick = widgetDescription.onlyClick;
 
     }
 
@@ -52,11 +52,11 @@ public class ActivityWidgetDescription {
         if (this == obj) return true;
         if (!(obj instanceof ActivityWidgetDescription)) return false;
         ActivityWidgetDescription widget = (ActivityWidgetDescription) obj;
-        return bonus.equals(widget.bonus);
+        return position.equals(widget.position);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(bonus);
+        return Objects.hash(position);
     }
 }

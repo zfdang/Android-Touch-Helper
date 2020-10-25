@@ -29,13 +29,13 @@ public class ActivityPositionDescription {
         this.number = number;
     }
 
-    public ActivityPositionDescription(ActivityPositionDescription position) {
-        this.packageName = position.packageName;
-        this.activityName = position.activityName;
-        this.x = position.x;
-        this.y = position.y;
-        this.delay = position.delay;
-        this.period = position.period;
-        this.number = position.number;
+    public ActivityPositionDescription(ActivityPositionDescription positionDescription) {
+        this.packageName = positionDescription.packageName;
+        this.activityName = positionDescription.activityName;
+        this.x = positionDescription.x;
+        this.y = positionDescription.y;
+        this.delay = positionDescription.delay;
+        this.period = positionDescription.period;
+        this.number = positionDescription.number;
     }
 }

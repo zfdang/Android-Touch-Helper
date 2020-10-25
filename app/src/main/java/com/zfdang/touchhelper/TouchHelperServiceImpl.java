@@ -1,12 +1,10 @@
 package com.zfdang.touchhelper;
 
 import android.accessibilityservice.AccessibilityService;
-import android.accessibilityservice.AccessibilityServiceInfo;
 import android.accessibilityservice.GestureDescription;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Path;
@@ -25,8 +23,6 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
-import android.view.inputmethod.InputMethodInfo;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -393,7 +389,7 @@ public class TouchHelperServiceImpl {
     }
 
     /**
-     * 查找并点击由WidgetButtonDescribe定义的控件
+     * 查找并点击由 ActivityWidgetDescription 定义的控件
      */
     private void findSkipButtonByWidget(AccessibilityNodeInfo root, Set<ActivityWidgetDescription> set) {
         int a = 0;
@@ -411,11 +407,11 @@ public class TouchHelperServiceImpl {
                 CharSequence cText = node.getText();
                 for (ActivityWidgetDescription e : set) {
                     boolean isFind = false;
-                    if (temRect.equals(e.bonus)) {
+                    if (temRect.equals(e.position)) {
                         isFind = true;
                     } else if (cId != null && !e.idName.isEmpty() && cId.toString().equals(e.idName)) {
                         isFind = true;
-                    } else if (cDescribe != null && !e.describe.isEmpty() && cDescribe.toString().contains(e.describe)) {
+                    } else if (cDescribe != null && !e.description.isEmpty() && cDescribe.toString().contains(e.description)) {
                         isFind = true;
                     } else if (cText != null && !e.text.isEmpty() && cText.toString().contains(e.text)) {
                         isFind = true;
@@ -724,13 +720,13 @@ public class TouchHelperServiceImpl {
                             @Override
                             public void onFocusChange(View v, boolean hasFocus) {
                                 if (hasFocus) {
-                                    widgetDescription.bonus = temRect;
+                                    widgetDescription.position = temRect;
                                     widgetDescription.clickable = e.isClickable();
                                     widgetDescription.className = e.getClassName().toString();
                                     CharSequence cId = e.getViewIdResourceName();
                                     widgetDescription.idName = cId == null ? "" : cId.toString();
                                     CharSequence cDesc = e.getContentDescription();
-                                    widgetDescription.describe = cDesc == null ? "" : cDesc.toString();
+                                    widgetDescription.description = cDesc == null ? "" : cDesc.toString();
                                     CharSequence cText = e.getText();
                                     widgetDescription.text = cText == null ? "" : cText.toString();
                                     btAddWidget.setEnabled(true);
