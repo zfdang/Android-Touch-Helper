@@ -1,5 +1,6 @@
 package com.zfdang.touchhelper;
 
+import android.graphics.Rect;
 import android.util.Log;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
@@ -33,6 +34,38 @@ public class Utilities {
 
     public static void toast(CharSequence cs) {
         Toast.makeText(TouchHelperApp.getAppContext(), cs, Toast.LENGTH_SHORT).show();
+    }
+
+    public static String describeAccessibilityNode(AccessibilityNodeInfo e){
+        if(e == null) {
+            return "null";
+        }
+
+        String result = "AccessibilityNode";
+
+        result += " Classname=" + e.getClassName().toString();
+
+        final Rect rect = new Rect();
+        e.getBoundsInScreen(rect);
+        result += String.format(" Position=[%d, %d, %d, %d]", rect.left, rect.right, rect.top, rect.bottom);
+
+
+        CharSequence id = e.getViewIdResourceName();
+        if(id != null) {
+            result += " ResourceId=" + id.toString();
+        }
+
+        CharSequence description = e.getContentDescription();
+        if(description != null) {
+            result += " Description=" + description.toString();
+        }
+
+        CharSequence text = e.getText();
+        if(text != null) {
+            result += " Text=" + text.toString();
+        }
+
+        return result;
     }
 
 }

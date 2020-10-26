@@ -6,7 +6,6 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.util.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -90,10 +89,10 @@ public class Settings {
         // load activity positions
         json = mPreference.getString(ACTIVITY_POSITIONS, null);
         if (json != null) {
-            Type type = new TypeToken<TreeMap<String, ActivityPositionDescription>>() {}.getType();
-            mapActivityPositions = mJson.fromJson(json, type);
+            Type type = new TypeToken<TreeMap<String, PackagePositionDescription>>() {}.getType();
+            mapPackagePositions = mJson.fromJson(json, type);
         } else {
-            mapActivityPositions = new TreeMap<>();
+            mapPackagePositions = new TreeMap<>();
         }
 
     }
@@ -155,11 +154,11 @@ public class Settings {
 
     // map of key activity positions
     private static final String ACTIVITY_POSITIONS = "ACTIVITY_POSITIONS";
-    private Map<String, ActivityPositionDescription> mapActivityPositions;
-    public Map<String, ActivityPositionDescription> getActivityPositions() { return mapActivityPositions; }
-    public void setActivityPositions(Map<String, ActivityPositionDescription> map) {
-        mapActivityPositions = map;
-        String json = mJson.toJson(mapActivityPositions);
+    private Map<String, PackagePositionDescription> mapPackagePositions;
+    public Map<String, PackagePositionDescription> getPackagePositions() { return mapPackagePositions; }
+    public void setPackagePositions(Map<String, PackagePositionDescription> map) {
+        mapPackagePositions = map;
+        String json = mJson.toJson(mapPackagePositions);
 //        Log.d(TAG, json);
         mEditor.putString(ACTIVITY_POSITIONS, json);
         mEditor.apply();

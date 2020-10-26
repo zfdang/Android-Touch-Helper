@@ -28,7 +28,7 @@ import androidx.preference.MultiSelectListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
-import com.zfdang.touchhelper.ActivityPositionDescription;
+import com.zfdang.touchhelper.PackagePositionDescription;
 import com.zfdang.touchhelper.ActivityWidgetDescription;
 import com.zfdang.touchhelper.R;
 import com.zfdang.touchhelper.Settings;
@@ -60,7 +60,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     MultiSelectListPreference activity_positions;
     MultiSelectListPreference activity_widgets;
     Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
-    Map<String, ActivityPositionDescription> mapActivityPositions;
+    Map<String, PackagePositionDescription> mapActivityPositions;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -337,7 +337,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
         // manage saved activity positions
         activity_positions = (MultiSelectListPreference) findPreference("setting_activity_positions");
-        mapActivityPositions = Settings.getInstance().getActivityPositions();
+        mapActivityPositions = Settings.getInstance().getPackagePositions();
         updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
         activity_positions.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
             @Override
@@ -353,7 +353,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                         mapActivityPositions.remove(key);
                     }
                 }
-                Settings.getInstance().setActivityPositions(mapActivityPositions);
+                Settings.getInstance().setPackagePositions(mapActivityPositions);
 
                 // refresh MultiSelectListPreference
                 updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
@@ -387,7 +387,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         mapActivityWidgets = Settings.getInstance().getActivityWidgets();
         updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
 
-        mapActivityPositions = Settings.getInstance().getActivityPositions();
+        mapActivityPositions = Settings.getInstance().getPackagePositions();
         updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
     }
 }

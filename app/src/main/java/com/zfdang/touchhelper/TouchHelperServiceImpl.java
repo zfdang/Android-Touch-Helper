@@ -64,9 +64,10 @@ public class TouchHelperServiceImpl {
     private Set<String> pkgLaunchers, pkgWhiteList;
     private List<String> keyWordList;
 
-    private Map<String, ActivityPositionDescription> mapActivityPositions;
+    private Map<String, PackagePositionDescription> mapPackagePositions;
     private Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
     private Set<ActivityWidgetDescription> setWidgets;
+    private PackagePositionDescription packagePositionDescription;
 
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
@@ -119,7 +120,7 @@ public class TouchHelperServiceImpl {
 
             // load pre-defined widgets or positions
             mapActivityWidgets = mSetting.getActivityWidgets();
-            mapActivityPositions = mSetting.getActivityPositions();
+            mapPackagePositions = mSetting.getPackagePositions();
 
             // collect all installed packages
             packageManager = service.getPackageManager();
@@ -169,7 +170,7 @@ public class TouchHelperServiceImpl {
                         break;
                     case TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY:
                         mapActivityWidgets = mSetting.getActivityWidgets();
-                        mapActivityPositions = mSetting.getActivityPositions();
+                        mapPackagePositions = mSetting.getPackagePositions();
 //                        Log.d(TAG, mapActivityWidgets.keySet().toString());
 //                        Log.d(TAG, mapActivityPositions.keySet().toString());
                         break;
@@ -223,8 +224,8 @@ public class TouchHelperServiceImpl {
     // 1. TYPE_WINDOW_STATE_CHANGED, 判断packageName和activityName
     // 2. TYPE_WINDOW_CONTENT_CHANGED, 尝试两种方法去跳过广告；如果重复次数超出预设，停止尝试
     public void onAccessibilityEvent(AccessibilityEvent event) {
-//        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName()
-//                + " - " + event.getClassName() + "; " + currentPackageName + " - " + currentActivityName);
+//        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName() + " - " + event.getClassName() + "; ");
+//        Log.d(TAG, "    currentPackageName = " + currentPackageName + "  currentActivityName = " + currentActivityName);
         try {
             switch (event.getEventType()) {
                 case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
@@ -232,13 +233,13 @@ public class TouchHelperServiceImpl {
                     CharSequence tempClassName = event.getClassName();
 
                     if(tempPkgName == null || tempClassName == null) {
-                        currentPackageName = "initial package";
-                        currentActivityName = "initial activity";
+//                        currentPackageName = "initial package";
+//                        currentActivityName = "initial activity";
                         break;
                     }
 
                     String pkgName = tempPkgName.toString();
-                    String actName = tempClassName.toString();
+                    final String actName = tempClassName.toString();
                     boolean isActivity = !actName.startsWith("android.widget.") && !actName.startsWith("android.view.");
 
                     if(currentPackageName.equals(pkgName)) {
@@ -278,23 +279,26 @@ public class TouchHelperServiceImpl {
                     // now to take different methods to skip ads
                     if (b_method_by_activity_position) {
 //                        Log.d(TAG, "method by position in STATE_CHANGED");
-                        final ActivityPositionDescription activityPositionDescription = mapActivityPositions.get(actName);
-                        if (activityPositionDescription != null) {
+                        packagePositionDescription = mapPackagePositions.get(currentPackageName);
+                        if (packagePositionDescription != null) {
                             // try multiple times to click the position to skip ads
                             ShowToastInIntentService("正在根据位置跳过广告...");
-//                            Log.d(TAG, "Find skip-ad by position, simulate click " + activityPositionDescription.toString());
                             executorService.scheduleAtFixedRate(new Runnable() {
                                 int num = 0;
                                 @Override
                                 public void run() {
-                                    if (num < activityPositionDescription.number && currentActivityName.equals(activityPositionDescription.activityName)) {
-                                        click(activityPositionDescription.x, activityPositionDescription.y, 0, 20);
-                                        num++;
+                                    if (num < packagePositionDescription.number) {
+                                        if(currentActivityName.equals(packagePositionDescription.activityName)) {
+                                            // current activity is null, or current activity is the target activity
+//                                            Log.d(TAG, "Find skip-ad by position, simulate click now! ");
+                                            click(packagePositionDescription.x, packagePositionDescription.y, 0, 40);
+                                        }
+                                        num ++;
                                     } else {
                                         throw new RuntimeException();
                                     }
                                 }
-                            }, activityPositionDescription.delay, activityPositionDescription.period, TimeUnit.MILLISECONDS);
+                            }, packagePositionDescription.delay, packagePositionDescription.period, TimeUnit.MILLISECONDS);
                         } else {
                             // no customized positions for this activity
                             b_method_by_activity_position = false;
@@ -315,7 +319,7 @@ public class TouchHelperServiceImpl {
 
                     if (b_method_by_button_keyword) {
 //                        Log.d(TAG, "method by keywords in STATE_CHANGED");
-                        findSkipButtonByText(service.getRootInActiveWindow());
+                        findSkipButtonByTextOrDescription(service.getRootInActiveWindow());
                     }
                     break;
                 case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:
@@ -331,7 +335,7 @@ public class TouchHelperServiceImpl {
 
                     if (b_method_by_button_keyword) {
 //                        Log.d(TAG, "method by keywords in CONTENT_CHANGED");
-                        findSkipButtonByText(event.getSource());
+                        findSkipButtonByTextOrDescription(event.getSource());
                     }
                     break;
                 case AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED:
@@ -352,40 +356,94 @@ public class TouchHelperServiceImpl {
     }
 
     /**
-     * 自动查找启动广告的“跳过”的控件
+     * 自动查找启动广告的“跳过”的控件, 这个方法目前没被使用，因为有些控件不设text, 而description里包含了关键字
      */
-    private void findSkipButtonByText(AccessibilityNodeInfo nodeInfo) {
-        if (nodeInfo == null) return;
-        for (int n = 0; n < keyWordList.size(); n++) {
-            String keyword = keyWordList.get(n);
-            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText(keyword);
-            if (!list.isEmpty()) {
-                for (AccessibilityNodeInfo e : list) {
-//                    Log.d(TAG, "Find skip-ad by keywords " + e.toString() + " label size = ");
-//                    Utilities.printNodeStack(e);
-                    // add more validation about the node: 找到的按钮，不能比关键字的长度超出太多
-                    String label = e.getText().toString();
-                    if(label != null && label.length() <= keyword.length() + 4){
-//                        Log.d(TAG, "label = " + label + " keyword = " + keyword);
-                        ShowToastInIntentService("正在根据关键字跳过广告...");
+//    private void findSkipButtonByText(AccessibilityNodeInfo nodeInfo) {
+//        if (nodeInfo == null) return;
+//        for (int n = 0; n < keyWordList.size(); n++) {
+//            String keyword = keyWordList.get(n);
+//            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText(keyword);
+//            if (!list.isEmpty()) {
+//                for (AccessibilityNodeInfo e : list) {
+////                    Log.d(TAG, "Find skip-ad by keywords " + e.toString() + " label size = ");
+////                    Utilities.printNodeStack(e);
+//                    // add more validation about the node: 找到的按钮，不能比关键字的长度超出太多
+//                    String label = e.getText().toString();
+//                    if(label != null && label.length() <= keyword.length() + 4){
+////                        Log.d(TAG, "label = " + label + " keyword = " + keyword);
+//                        ShowToastInIntentService("正在根据关键字跳过广告...");
+//
+//                        if (!e.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+//                            if (!e.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+//                                Rect rect = new Rect();
+//                                e.getBoundsInScreen(rect);
+//                                click(rect.centerX(), rect.centerY(), 0, 20);
+//                            }
+//                        }
+//                    }
+//
+//                    e.recycle();
+//                }
+//                b_method_by_button_keyword = false;
+//                return;
+//            }
+//
+//        }
+//        nodeInfo.recycle();
+//    }
 
-                        if (!e.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                            if (!e.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+    /**
+     * 查找并点击包含keyword控件，目标包括Text和Description
+     * * */
+    private void findSkipButtonByTextOrDescription(AccessibilityNodeInfo root) {
+        ArrayList<AccessibilityNodeInfo> listA = new ArrayList<>();
+        ArrayList<AccessibilityNodeInfo> listB = new ArrayList<>();
+        listA.add(root);
+
+        int total = listA.size();
+        int index = 0;
+        while (index < total) {
+            AccessibilityNodeInfo node = listA.get(index++);
+            if (node != null) {
+                CharSequence description = node.getContentDescription();
+                CharSequence text = node.getText();
+                Log.d(TAG, Utilities.describeAccessibilityNode(node));
+
+                // try to find keyword
+                for (String keyword: keyWordList) {
+                    boolean isFind = false;
+                    // text or description contains keyword, but not too long （<= length + 4）
+                    if (text != null && (text.toString().length() <= keyword.length() + 4 ) && text.toString().contains(keyword)) {
+                        isFind = true;
+                    } else if (description != null && (description.toString().length() <= keyword.length() + 4) && description.toString().contains(keyword)) {
+                        isFind = true;
+                    }
+
+                    if (isFind) {
+                        ShowToastInIntentService("正在根据关键字跳过广告...");
+                        if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                            if (!node.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                                 Rect rect = new Rect();
-                                e.getBoundsInScreen(rect);
+                                node.getBoundsInScreen(rect);
                                 click(rect.centerX(), rect.centerY(), 0, 20);
                             }
                         }
                     }
-
-                    e.recycle();
                 }
-                b_method_by_button_keyword = false;
-                return;
+                for (int n = 0; n < node.getChildCount(); n++) {
+                    listB.add(node.getChild(n));
+                }
+                node.recycle();
             }
 
+            // reach the end of listA
+            if (index == total) {
+                listA = listB;
+                listB = new ArrayList<>();
+                index = 0;
+                total = listA.size();
+            }
         }
-        nodeInfo.recycle();
     }
 
     /**
@@ -449,17 +507,18 @@ public class TouchHelperServiceImpl {
     /**
      * 查找所有的控件
      */
-    private void findAllNode(List<AccessibilityNodeInfo> roots, List<AccessibilityNodeInfo> list) {
+    private void findAllNode(List<AccessibilityNodeInfo> roots, List<AccessibilityNodeInfo> list, String indent) {
         ArrayList<AccessibilityNodeInfo> childrenList = new ArrayList<>();
         for (AccessibilityNodeInfo e : roots) {
             if (e == null) continue;
             list.add(e);
+//            Log.d(TAG, indent + Utilities.describeAccessibilityNode(e));
             for (int n = 0; n < e.getChildCount(); n++) {
                 childrenList.add(e.getChild(n));
             }
         }
         if (!childrenList.isEmpty()) {
-            findAllNode(childrenList, list);
+            findAllNode(childrenList, list, indent + "  ");
         }
     }
 
@@ -481,33 +540,38 @@ public class TouchHelperServiceImpl {
      * 关闭ContentChanged事件的响应
      */
     private void startSkipAdProcess() {
+//        Log.d(TAG, "Start Skip-ad process");
         b_method_by_activity_position = true;
         b_method_by_activity_widget = true;
         b_method_by_button_keyword = true;
         setWidgets = null;
+        packagePositionDescription = null;
 
-        // cancel all methods 5 seconds later
+        // cancel all methods 4 seconds later
         if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
             futureExpireSkipAdProcess.cancel(true);
         }
         futureExpireSkipAdProcess = executorService.schedule(new Runnable() {
             @Override
             public void run() {
+//                Log.d(TAG, "Stop Skip-ad process");
                 b_method_by_activity_position = false;
                 b_method_by_activity_widget = false;
                 b_method_by_button_keyword = false;
             }
-        }, 5000, TimeUnit.MILLISECONDS);
+        }, 4000, TimeUnit.MILLISECONDS);
     }
 
     /**
      * 关闭ContentChanged事件的响应
      */
     private void stopSkipAdProcess() {
+//        Log.d(TAG, "Stop Skip-ad process");
         b_method_by_activity_position = false;
         b_method_by_activity_widget = false;
         b_method_by_button_keyword = false;
         setWidgets = null;
+        packagePositionDescription =  null;
         if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
             futureExpireSkipAdProcess.cancel(true);
         }
@@ -568,7 +632,7 @@ public class TouchHelperServiceImpl {
 
 
         final ActivityWidgetDescription widgetDescription = new ActivityWidgetDescription();
-        final ActivityPositionDescription positionDescription = new ActivityPositionDescription("", "", 0, 0, 500, 500, 1);
+        final PackagePositionDescription positionDescription = new PackagePositionDescription("", "", 0, 0, 500, 500, 6);
 
         final LayoutInflater inflater = LayoutInflater.from(service);
         // activity customization view
@@ -690,7 +754,7 @@ public class TouchHelperServiceImpl {
                     ArrayList<AccessibilityNodeInfo> roots = new ArrayList<>();
                     roots.add(root);
                     ArrayList<AccessibilityNodeInfo> nodeList = new ArrayList<>();
-                    findAllNode(roots, nodeList);
+                    findAllNode(roots, nodeList, "");
                     Collections.sort(nodeList, new Comparator<AccessibilityNodeInfo>() {
                         @Override
                         public int compare(AccessibilityNodeInfo a, AccessibilityNodeInfo b) {
@@ -799,11 +863,11 @@ public class TouchHelperServiceImpl {
         btAddPosition.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mapActivityPositions.put(positionDescription.activityName, new ActivityPositionDescription(positionDescription));
+                mapPackagePositions.put(positionDescription.packageName, new PackagePositionDescription(positionDescription));
                 btAddPosition.setEnabled(false);
                 tvPackageName.setText(positionDescription.packageName + " (以下坐标数据已保存)");
                 // save
-                Settings.getInstance().setActivityPositions(mapActivityPositions);
+                Settings.getInstance().setPackagePositions(mapPackagePositions);
             }
         });
         btQuit.setOnClickListener(new View.OnClickListener() {
