@@ -407,7 +407,7 @@ public class TouchHelperServiceImpl {
             if (node != null) {
                 CharSequence description = node.getContentDescription();
                 CharSequence text = node.getText();
-                Log.d(TAG, Utilities.describeAccessibilityNode(node));
+//                Log.d(TAG, Utilities.describeAccessibilityNode(node));
 
                 // try to find keyword
                 for (String keyword: keyWordList) {
