@@ -53,7 +53,6 @@
 <img src="images/status.jpeg" width="200">
 <img src="images/settings.jpeg" width="200">
 <img src="images/keyword.jpeg" width="200">
-<img src="images/whitelist.jpeg" width="200">
 <img src="images/customization.jpeg" width="200">
 <img src="images/about.jpeg" width="200">
 </p>
@@ -68,7 +67,15 @@
 
 [设置程序](/enable)
 
-### 2. 跳过广告的高级设置
+### 2. 在一些不含广告的应用里频繁提示跳过
+
+那是因为程序在应用里发现了关键字。如果问题严重，请将应用添加到“白名单”里
+
+<p>
+<img src="whitelist.jpeg" width="250">
+</p>
+
+### 3. 跳过广告的高级设置
 
 除了关键字外，程序支持对一些特殊的应用，指定控件或者位置，然后程序会自动点击对应的控件或者位置，帮助用户实现某些目标。
 
