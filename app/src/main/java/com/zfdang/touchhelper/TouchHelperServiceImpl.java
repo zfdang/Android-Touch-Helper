@@ -42,6 +42,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class TouchHelperServiceImpl {
 
@@ -68,6 +70,7 @@ public class TouchHelperServiceImpl {
     private Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
     private Set<ActivityWidgetDescription> setWidgets;
     private PackagePositionDescription packagePositionDescription;
+    private ReentrantLock toastLock = new ReentrantLock();
 
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
@@ -400,6 +403,8 @@ public class TouchHelperServiceImpl {
         ArrayList<AccessibilityNodeInfo> listB = new ArrayList<>();
         listA.add(root);
 
+//        showAllChildren(root);
+
         int total = listA.size();
         int index = 0;
         while (index < total) {
@@ -407,7 +412,6 @@ public class TouchHelperServiceImpl {
             if (node != null) {
                 CharSequence description = node.getContentDescription();
                 CharSequence text = node.getText();
-//                Log.d(TAG, Utilities.describeAccessibilityNode(node));
 
                 // try to find keyword
                 for (String keyword: keyWordList) {
@@ -421,6 +425,9 @@ public class TouchHelperServiceImpl {
 
                     if (isFind) {
                         ShowToastInIntentService("正在根据关键字跳过广告...");
+//                        Log.d(TAG, Utilities.describeAccessibilityNode(node));
+//                        Log.d(TAG, "keyword = " + keyword);
+
                         if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                             if (!node.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                                 Rect rect = new Rect();
@@ -428,6 +435,7 @@ public class TouchHelperServiceImpl {
                                 click(rect.centerX(), rect.centerY(), 0, 20);
                             }
                         }
+                        break;
                     }
                 }
                 for (int n = 0; n < node.getChildCount(); n++) {
@@ -504,6 +512,14 @@ public class TouchHelperServiceImpl {
         }
     }
 
+
+    private void showAllChildren(AccessibilityNodeInfo root){
+        ArrayList<AccessibilityNodeInfo> roots = new ArrayList<>();
+        roots.add(root);
+        ArrayList<AccessibilityNodeInfo> nodeList = new ArrayList<>();
+        findAllNode(roots, nodeList, "");
+    }
+
     /**
      * 查找所有的控件
      */
@@ -572,6 +588,7 @@ public class TouchHelperServiceImpl {
         b_method_by_button_keyword = false;
         setWidgets = null;
         packagePositionDescription =  null;
+        if(toastLock.isLocked()){ toastLock.unlock(); }
         if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
             futureExpireSkipAdProcess.cancel(true);
         }
@@ -886,7 +903,8 @@ public class TouchHelperServiceImpl {
 
     public void ShowToastInIntentService(final String sText) {
         final Context myContext = this.service;
-        if(mSetting.isSkipAdNotification()) {
+        // show one toast in 5 seconds only
+        if(mSetting.isSkipAdNotification() && toastLock.tryLock()) {
             new Handler(Looper.getMainLooper()).post(new Runnable() {
                 @Override
                 public void run() {
