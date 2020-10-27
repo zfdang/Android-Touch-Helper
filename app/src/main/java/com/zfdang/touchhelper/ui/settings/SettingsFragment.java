@@ -27,6 +27,7 @@ import androidx.preference.EditTextPreference;
 import androidx.preference.MultiSelectListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.SeekBarPreference;
 
 import com.zfdang.touchhelper.PackagePositionDescription;
 import com.zfdang.touchhelper.PackageWidgetDescription;
@@ -90,6 +91,25 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                 }
             });
         }
+
+        final SeekBarPreference duration = findPreference("skip_ad_duration");
+        if(duration != null) {
+            duration.setMax(10);
+            duration.setMin(1);
+            duration.setUpdatesContinuously(true);
+            duration.setValue(mSetting.getSkipAdDuration());
+
+            duration.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    int value = duration.getValue() + duration.getMin();
+                    mSetting.setSkipAdDuration(value);
+
+                    return true;
+                }
+            });
+        }
+
 
         // key words to detect skip-ad button
         EditTextPreference textKeyWords = findPreference("setting_key_words");
@@ -295,7 +315,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                     if(TouchHelperService.serviceImpl != null) {
                         TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_ACTIVITY_CUSTOMIZATION);
                     } else {
-                        Toast.makeText(getContext(),"触屏助手未运行，请打开无障碍服务", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(),"开屏跳过服务未运行，请打开无障碍服务!", Toast.LENGTH_SHORT).show();
                     }
                     return true;
                 }

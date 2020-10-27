@@ -11,13 +11,12 @@
             app:summaryOn="显示跳过通知"
             app:title="跳过广告时显示通知" />
 
-        <SwitchPreferenceCompat
-            app:dependency="skip_ad_notification"
-            app:key="skip_ad_notification_duration"
-            app:icon="@drawable/ic_access_time_24"
-            app:summaryOff="较短"
-            app:summaryOn="较长"
-            app:title="通知时间" />
+        <SeekBarPreference
+            app:key="skip_ad_duration"
+            app:icon="@drawable/ic_duration"
+            app:title="检测时长 (推荐值:4秒)"
+            app:summary="目标应用启动后，在此时间内检测广告，之后不再检测。如果时间过短，广告可能未加载完，导致无法跳过"
+            app:showSeekBarValue="true" />
 
     </PreferenceCategory>
 
@@ -26,7 +25,7 @@
         <EditTextPreference
             app:key="setting_key_words"
             app:title="跳过广告按钮的关键字"
-            app:icon="@drawable/ic_target_keywords"
+            app:icon="@drawable/ic_keyword"
             app:useSimpleSummaryProvider="true"
             app:dialogTitle="设置跳过广告按钮的关键字\n多个关键字请以空格分隔"/>
 

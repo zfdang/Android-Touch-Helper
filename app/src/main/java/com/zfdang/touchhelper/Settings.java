@@ -30,11 +30,9 @@ public class Settings {
 
     // Singleton
     private static Settings ourInstance = new Settings();
-
     public static Settings getInstance() {
         return ourInstance;
     }
-
     private Settings() {
         initSettings();
     }
@@ -47,6 +45,8 @@ public class Settings {
         // init all settings from SharedPreferences
         bSkipAdNotification = mPreference.getBoolean(SKIP_AD_NOTIFICATION, true);
 
+        // initial duration of skip ad process
+        iSkipAdDuration = mPreference.getInt(SKIP_AD_DURATION, 4);
 
         // find all system packages, and set them as default value for whitelist
         PackageManager packageManager = TouchHelperApp.getAppContext().getPackageManager();
@@ -111,6 +111,22 @@ public class Settings {
         }
     }
 
+
+    // duration of skip ad process
+    private static final String SKIP_AD_DURATION = "SKIP_AD_DURATION";
+    private int iSkipAdDuration;
+    public int getSkipAdDuration() {
+        return iSkipAdDuration;
+    }
+    public void setSkipAdDuration(int iSkipAdDuration) {
+        if (this.iSkipAdDuration != iSkipAdDuration) {
+            this.iSkipAdDuration = iSkipAdDuration;
+            mEditor.putInt(SKIP_AD_DURATION, this.iSkipAdDuration);
+            mEditor.apply();
+        }
+    }
+
+
     // whitelist of packages
     private static final String WHITELIST_PACKAGE = "WHITELIST_PACKAGE";
     private Set<String> setWhiteListPackages;
@@ -163,6 +179,5 @@ public class Settings {
         mEditor.putString(PACKAGE_POSITIONS, json);
         mEditor.apply();
     }
-
 
 }

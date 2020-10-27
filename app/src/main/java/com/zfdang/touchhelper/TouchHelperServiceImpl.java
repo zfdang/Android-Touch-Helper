@@ -553,7 +553,7 @@ public class TouchHelperServiceImpl {
     }
 
     /**
-     * 关闭ContentChanged事件的响应
+     * start the skip-ad process
      */
     private void startSkipAdProcess() {
 //        Log.d(TAG, "Start Skip-ad process");
@@ -570,28 +570,32 @@ public class TouchHelperServiceImpl {
         futureExpireSkipAdProcess = executorService.schedule(new Runnable() {
             @Override
             public void run() {
-//                Log.d(TAG, "Stop Skip-ad process");
-                b_method_by_activity_position = false;
-                b_method_by_activity_widget = false;
-                b_method_by_button_keyword = false;
+                stopSkipAdProcessInner();
             }
-        }, 4000, TimeUnit.MILLISECONDS);
+        }, mSetting.getSkipAdDuration() * 1000, TimeUnit.MILLISECONDS);
     }
 
     /**
-     * 关闭ContentChanged事件的响应
+     * stop the skip-ad process
      */
     private void stopSkipAdProcess() {
 //        Log.d(TAG, "Stop Skip-ad process");
+        stopSkipAdProcessInner();
+        if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
+            futureExpireSkipAdProcess.cancel(false);
+        }
+    }
+
+    /**
+     * stop the skip-ad process, without cancel scheduled task
+     */
+    private void stopSkipAdProcessInner() {
         b_method_by_activity_position = false;
         b_method_by_activity_widget = false;
         b_method_by_button_keyword = false;
         setWidgets = null;
         packagePositionDescription =  null;
         if(toastLock.isLocked()){ toastLock.unlock(); }
-        if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
-            futureExpireSkipAdProcess.cancel(true);
-        }
     }
 
     /**
