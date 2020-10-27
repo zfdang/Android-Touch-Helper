@@ -29,7 +29,7 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
 import com.zfdang.touchhelper.PackagePositionDescription;
-import com.zfdang.touchhelper.ActivityWidgetDescription;
+import com.zfdang.touchhelper.PackageWidgetDescription;
 import com.zfdang.touchhelper.R;
 import com.zfdang.touchhelper.Settings;
 import com.zfdang.touchhelper.TouchHelperService;
@@ -59,7 +59,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
     MultiSelectListPreference activity_positions;
     MultiSelectListPreference activity_widgets;
-    Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
+    Map<String, Set<PackageWidgetDescription>> mapActivityWidgets;
     Map<String, PackagePositionDescription> mapActivityPositions;
 
     @Override
@@ -304,7 +304,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
         // manage saved activity widgets
         activity_widgets = (MultiSelectListPreference) findPreference("setting_activity_widgets");
-        mapActivityWidgets = Settings.getInstance().getActivityWidgets();
+        mapActivityWidgets = Settings.getInstance().getPackageWidgets();
         updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
         activity_widgets.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
             @Override
@@ -320,7 +320,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                         mapActivityWidgets.remove(key);
                     }
                 }
-                Settings.getInstance().setActivityWidgets(mapActivityWidgets);
+                Settings.getInstance().setPackageWidgets(mapActivityWidgets);
 
                 // refresh MultiSelectListPreference
                 updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
@@ -384,7 +384,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         super.onResume();
 
         // these values might be changed by adding new widget or positions, update entries for these two multipeline
-        mapActivityWidgets = Settings.getInstance().getActivityWidgets();
+        mapActivityWidgets = Settings.getInstance().getPackageWidgets();
         updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
 
         mapActivityPositions = Settings.getInstance().getPackagePositions();

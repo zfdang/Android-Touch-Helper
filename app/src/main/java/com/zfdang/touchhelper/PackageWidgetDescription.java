@@ -4,12 +4,12 @@ import android.graphics.Rect;
 
 import java.util.Objects;
 
-public class ActivityWidgetDescription {
+public class PackageWidgetDescription {
     public String packageName, activityName, className, idName, description, text;
     public Rect position;
     public boolean clickable, onlyClick;
 
-    public ActivityWidgetDescription() {
+    public PackageWidgetDescription() {
         this.packageName = "";
         this.activityName = "";
         this.className = "";
@@ -21,7 +21,7 @@ public class ActivityWidgetDescription {
         this.onlyClick = false;
     }
 
-    public ActivityWidgetDescription(String packageName, String activityName, String className, String idName, String description, String text, Rect position, boolean clickable, boolean onlyClick) {
+    public PackageWidgetDescription(String packageName, String activityName, String className, String idName, String description, String text, Rect position, boolean clickable, boolean onlyClick) {
         this.packageName = packageName;
         this.activityName = activityName;
         this.className = className;
@@ -33,7 +33,7 @@ public class ActivityWidgetDescription {
         this.onlyClick = onlyClick;
     }
 
-    public ActivityWidgetDescription(ActivityWidgetDescription widgetDescription) {
+    public PackageWidgetDescription(PackageWidgetDescription widgetDescription) {
         this.packageName = widgetDescription.packageName;
         this.activityName = widgetDescription.activityName;
         this.className = widgetDescription.className;
@@ -50,8 +50,8 @@ public class ActivityWidgetDescription {
     public boolean equals(Object obj) {
         if (obj == null) return false;
         if (this == obj) return true;
-        if (!(obj instanceof ActivityWidgetDescription)) return false;
-        ActivityWidgetDescription widget = (ActivityWidgetDescription) obj;
+        if (!(obj instanceof PackageWidgetDescription)) return false;
+        PackageWidgetDescription widget = (PackageWidgetDescription) obj;
         return position.equals(widget.position);
     }
 

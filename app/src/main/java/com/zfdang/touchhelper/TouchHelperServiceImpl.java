@@ -42,7 +42,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class TouchHelperServiceImpl {
@@ -67,8 +66,8 @@ public class TouchHelperServiceImpl {
     private List<String> keyWordList;
 
     private Map<String, PackagePositionDescription> mapPackagePositions;
-    private Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
-    private Set<ActivityWidgetDescription> setWidgets;
+    private Map<String, Set<PackageWidgetDescription>> mapPackageWidgets;
+    private Set<PackageWidgetDescription> setWidgets;
     private PackagePositionDescription packagePositionDescription;
     private ReentrantLock toastLock = new ReentrantLock();
 
@@ -122,7 +121,7 @@ public class TouchHelperServiceImpl {
             pkgWhiteList = mSetting.getWhitelistPackages();
 
             // load pre-defined widgets or positions
-            mapActivityWidgets = mSetting.getActivityWidgets();
+            mapPackageWidgets = mSetting.getPackageWidgets();
             mapPackagePositions = mSetting.getPackagePositions();
 
             // collect all installed packages
@@ -172,7 +171,7 @@ public class TouchHelperServiceImpl {
                         updatePackage();
                         break;
                     case TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY:
-                        mapActivityWidgets = mSetting.getActivityWidgets();
+                        mapPackageWidgets = mSetting.getPackageWidgets();
                         mapPackagePositions = mSetting.getPackagePositions();
 //                        Log.d(TAG, mapActivityWidgets.keySet().toString());
 //                        Log.d(TAG, mapActivityPositions.keySet().toString());
@@ -310,7 +309,7 @@ public class TouchHelperServiceImpl {
 
                     if (b_method_by_activity_widget) {
 //                        Log.d(TAG, "method by widget in STATE_CHANGED");
-                        setWidgets = mapActivityWidgets.get(actName);
+                        setWidgets = mapPackageWidgets.get(currentPackageName);
                         if(setWidgets != null) {
 //                            Log.d(TAG, "Find skip-ad by widget, simulate click ");
                             findSkipButtonByWidget(service.getRootInActiveWindow(), setWidgets);
@@ -457,7 +456,7 @@ public class TouchHelperServiceImpl {
     /**
      * 查找并点击由 ActivityWidgetDescription 定义的控件
      */
-    private void findSkipButtonByWidget(AccessibilityNodeInfo root, Set<ActivityWidgetDescription> set) {
+    private void findSkipButtonByWidget(AccessibilityNodeInfo root, Set<PackageWidgetDescription> set) {
         int a = 0;
         int b = 1;
         ArrayList<AccessibilityNodeInfo> listA = new ArrayList<>();
@@ -471,7 +470,7 @@ public class TouchHelperServiceImpl {
                 CharSequence cId = node.getViewIdResourceName();
                 CharSequence cDescribe = node.getContentDescription();
                 CharSequence cText = node.getText();
-                for (ActivityWidgetDescription e : set) {
+                for (PackageWidgetDescription e : set) {
                     boolean isFind = false;
                     if (temRect.equals(e.position)) {
                         isFind = true;
@@ -648,7 +647,7 @@ public class TouchHelperServiceImpl {
         final int height = b ? metrics.heightPixels : metrics.widthPixels;
 
 
-        final ActivityWidgetDescription widgetDescription = new ActivityWidgetDescription();
+        final PackageWidgetDescription widgetDescription = new PackageWidgetDescription();
         final PackagePositionDescription positionDescription = new PackagePositionDescription("", "", 0, 0, 500, 500, 6);
 
         final LayoutInflater inflater = LayoutInflater.from(service);
@@ -862,19 +861,19 @@ public class TouchHelperServiceImpl {
         btAddWidget.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                ActivityWidgetDescription temWidget = new ActivityWidgetDescription(widgetDescription);
-                Set<ActivityWidgetDescription> set = mapActivityWidgets.get(widgetDescription.activityName);
+                PackageWidgetDescription temWidget = new PackageWidgetDescription(widgetDescription);
+                Set<PackageWidgetDescription> set = mapPackageWidgets.get(widgetDescription.packageName);
                 if (set == null) {
                     set = new HashSet<>();
                     set.add(temWidget);
-                    mapActivityWidgets.put(widgetDescription.activityName, set);
+                    mapPackageWidgets.put(widgetDescription.packageName, set);
                 } else {
                     set.add(temWidget);
                 }
                 btAddWidget.setEnabled(false);
                 tvPackageName.setText(widgetDescription.packageName + " (以下控件数据已保存)");
                 // save
-                Settings.getInstance().setActivityWidgets(mapActivityWidgets);
+                Settings.getInstance().setPackageWidgets(mapPackageWidgets);
             }
         });
         btAddPosition.setOnClickListener(new View.OnClickListener() {

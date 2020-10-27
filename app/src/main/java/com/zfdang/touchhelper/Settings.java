@@ -78,16 +78,16 @@ public class Settings {
         }
 
         // load activity widgets
-        json = mPreference.getString(ACTIVITY_WIDGETS, null);
+        json = mPreference.getString(PACKAGE_WIDGETS, null);
         if (json != null) {
-            Type type = new TypeToken<TreeMap<String, Set<ActivityWidgetDescription>>>() {}.getType();
-            mapActivityWidgets = mJson.fromJson(json, type);
+            Type type = new TypeToken<TreeMap<String, Set<PackageWidgetDescription>>>() {}.getType();
+            mapPackageWidgets = mJson.fromJson(json, type);
         } else {
-            mapActivityWidgets = new TreeMap<>();
+            mapPackageWidgets = new TreeMap<>();
         }
 
         // load activity positions
-        json = mPreference.getString(ACTIVITY_POSITIONS, null);
+        json = mPreference.getString(PACKAGE_POSITIONS, null);
         if (json != null) {
             Type type = new TypeToken<TreeMap<String, PackagePositionDescription>>() {}.getType();
             mapPackagePositions = mJson.fromJson(json, type);
@@ -141,26 +141,26 @@ public class Settings {
     }
 
     // map of key activity widgets
-    private static final String ACTIVITY_WIDGETS = "ACTIVITY_WIDGETS";
-    private Map<String, Set<ActivityWidgetDescription>> mapActivityWidgets;
-    public Map<String, Set<ActivityWidgetDescription>> getActivityWidgets() { return mapActivityWidgets; }
-    public void setActivityWidgets(Map<String, Set<ActivityWidgetDescription>> map) {
-        mapActivityWidgets = map;
-        String json = mJson.toJson(mapActivityWidgets);
+    private static final String PACKAGE_WIDGETS = "PACKAGE_WIDGETS";
+    private Map<String, Set<PackageWidgetDescription>> mapPackageWidgets;
+    public Map<String, Set<PackageWidgetDescription>> getPackageWidgets() { return mapPackageWidgets; }
+    public void setPackageWidgets(Map<String, Set<PackageWidgetDescription>> map) {
+        mapPackageWidgets = map;
+        String json = mJson.toJson(mapPackageWidgets);
 //        Log.d(TAG, json);
-        mEditor.putString(ACTIVITY_WIDGETS, json);
+        mEditor.putString(PACKAGE_WIDGETS, json);
         mEditor.apply();
     }
 
-    // map of key activity positions
-    private static final String ACTIVITY_POSITIONS = "ACTIVITY_POSITIONS";
+    // map of key package positions
+    private static final String PACKAGE_POSITIONS = "PACKAGE_POSITIONS";
     private Map<String, PackagePositionDescription> mapPackagePositions;
     public Map<String, PackagePositionDescription> getPackagePositions() { return mapPackagePositions; }
     public void setPackagePositions(Map<String, PackagePositionDescription> map) {
         mapPackagePositions = map;
         String json = mJson.toJson(mapPackagePositions);
 //        Log.d(TAG, json);
-        mEditor.putString(ACTIVITY_POSITIONS, json);
+        mEditor.putString(PACKAGE_POSITIONS, json);
         mEditor.apply();
     }
 
