@@ -65,16 +65,12 @@ public class Settings {
         setWhiteListPackages = new HashSet<String>(mPreference.getStringSet(WHITELIST_PACKAGE, pkgSystems));
 
         // init key words
-        String json = mPreference.getString(KEY_WORDS_LIST, null);
+        String json = mPreference.getString(KEY_WORDS_LIST, "[\"跳过\"]");
         if(json != null) {
             Type type = new TypeToken<ArrayList<String>>() {}.getType();
             listKeyWords = mJson.fromJson(json, type);
         } else {
             listKeyWords = new ArrayList<>();
-        }
-        if(listKeyWords.size() == 0) {
-            listKeyWords.add("跳过");
-            listKeyWords.add("跳过广告");
         }
 
         // load activity widgets
@@ -151,7 +147,6 @@ public class Settings {
         listKeyWords.clear();
         listKeyWords.addAll(Arrays.asList(keys));
         String json = mJson.toJson(listKeyWords);
-//        Log.d(TAG, json);
         mEditor.putString(KEY_WORDS_LIST, json);
         mEditor.apply();
     }
