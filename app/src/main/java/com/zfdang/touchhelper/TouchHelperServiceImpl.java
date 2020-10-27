@@ -2,6 +2,7 @@ package com.zfdang.touchhelper;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -636,6 +637,7 @@ public class TouchHelperServiceImpl {
     }
 
     // display activity customization dialog, and allow users to pick widget or positions
+    @SuppressLint("ClickableViewAccessibility")
     private void showActivityCustomizationDialog() {
         // show activity customization window
         final WindowManager windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
@@ -722,6 +724,7 @@ public class TouchHelperServiceImpl {
                 return true;
             }
         });
+
         imageTarget.setOnTouchListener(new View.OnTouchListener() {
             int x = 0, y = 0, width = targetParams.width / 2, height = targetParams.height / 2;
 
@@ -757,6 +760,7 @@ public class TouchHelperServiceImpl {
                 return true;
             }
         });
+
         btShowOutline.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
