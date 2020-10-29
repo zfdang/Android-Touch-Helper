@@ -22,14 +22,13 @@
 
 ## 2. 在电源优化里选择不优化本程序
 
-Changing the battery optimization settings varies between each device, so we've written this guide that covers how to do this for most models: 
-
+安卓系统会对应用进行电源优化。请将本程序的电源优化设置成“不优化”。
 
 <p><img src="images/power-optimization.jpeg" width="250"></p>
 
 ## 3. 在任务管理或者后台清理程序里豁免本程序
 
-If you've installed a third-party app to clean your phone or stop running background processes, you'll need to make an exclusion for this service. 
+请在任务管理，或者后台清理程序里，将本程序锁定，避免被误杀。
 
 <p><img src="images/task-lock.jpeg" width="250"></p>
 

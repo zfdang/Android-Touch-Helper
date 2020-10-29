@@ -51,7 +51,7 @@
 <img src="images/status.jpeg" width="200">
 <img src="images/settings.jpeg" width="200">
 <img src="images/keyword.jpeg" width="200">
-<img src="images/customization.jpeg" width="200">
+<img src="images/customization_2.jpeg" width="200">
 <img src="images/about.jpeg" width="200">
 </p>
 
