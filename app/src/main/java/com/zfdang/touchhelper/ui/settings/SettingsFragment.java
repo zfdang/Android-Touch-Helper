@@ -22,6 +22,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.preference.CheckBoxPreference;
 import androidx.preference.EditTextPreference;
 import androidx.preference.MultiSelectListPreference;
@@ -74,6 +76,22 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         winManager = (WindowManager) getActivity().getSystemService(WINDOW_SERVICE);
         inflater = (LayoutInflater)getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         packageManager = getActivity().getPackageManager();
+    }
+
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = super.onCreateView(inflater, container, savedInstanceState);
+
+        // get the height of BottomNavigationView
+        int resourceId = getResources().getIdentifier("design_bottom_navigation_height", "dimen", getActivity().getPackageName());
+        int height = 147;
+        if (resourceId > 0) {
+            height = getResources().getDimensionPixelSize(resourceId);
+        }
+
+        // set bottom padding for the preference fragment, so that all parts could be shown properly
+        view.setPadding(view.getPaddingLeft(), view.getPaddingTop(), view.getPaddingRight(), view.getPaddingBottom() + height);
+        return view;
     }
 
     private void initPreferences() {
