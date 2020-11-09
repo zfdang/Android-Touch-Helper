@@ -162,6 +162,18 @@ public class Settings {
         mEditor.putString(PACKAGE_WIDGETS, json);
         mEditor.apply();
     }
+    public String getPackageWidgetsInString() {
+        String json = mJson.toJson(mapPackageWidgets);
+        return json;
+    }
+    public void setPackageWidgetsInString(String value) {
+        if (value != null) {
+            Type type = new TypeToken<TreeMap<String, Set<PackageWidgetDescription>>>() {}.getType();
+            mapPackageWidgets = mJson.fromJson(value, type);
+            mEditor.putString(PACKAGE_WIDGETS, value);
+            mEditor.apply();
+        }
+    }
 
     // map of key package positions
     private static final String PACKAGE_POSITIONS = "PACKAGE_POSITIONS";

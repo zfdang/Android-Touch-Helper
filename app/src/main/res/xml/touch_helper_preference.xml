@@ -54,6 +54,12 @@
             app:entryValues="@array/empty_entries"
             app:dialogTitle="勾选要保留的程序"/>
 
+        <Preference
+            app:key="setting_activity_widgets_advanced"
+            app:icon="@drawable/ic_widgets_edit"
+            app:summary="手动添加程序的跳过按钮或者跳过区域"
+            app:title="导入/导出已添加按钮的程序" />
+
         <MultiSelectListPreference
             app:key="setting_activity_positions"
             app:icon="@drawable/ic_activity_position"

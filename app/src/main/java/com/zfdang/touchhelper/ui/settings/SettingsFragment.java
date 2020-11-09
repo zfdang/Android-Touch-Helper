@@ -2,6 +2,7 @@ package com.zfdang.touchhelper.ui.settings;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -24,6 +25,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.FragmentManager;
 import androidx.preference.CheckBoxPreference;
 import androidx.preference.EditTextPreference;
 import androidx.preference.MultiSelectListPreference;
@@ -373,7 +375,23 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         });
 
 
-        // manage saved activity positions
+        // advanced method to manage "customized package widgets", by editing the raw setting
+        Preference package_widgets_advance = findPreference("setting_activity_widgets_advanced");
+        if(package_widgets_advance != null) {
+            package_widgets_advance.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    FragmentManager fragmentManager = getActivity().getSupportFragmentManager();
+                    ManagePackageWidgetsDialogFragment newFragment = new ManagePackageWidgetsDialogFragment();
+                    newFragment.show(fragmentManager, "dialog");
+                    return true;
+                }
+            });
+        }
+
+
+
+            // manage saved activity positions
         activity_positions = (MultiSelectListPreference) findPreference("setting_activity_positions");
         mapActivityPositions = Settings.getInstance().getPackagePositions();
         updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
