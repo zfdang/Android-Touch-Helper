@@ -57,8 +57,8 @@
         <Preference
             app:key="setting_activity_widgets_advanced"
             app:icon="@drawable/ic_widgets_edit"
-            app:summary="手动添加程序的跳过按钮或者跳过区域"
-            app:title="导入/导出已添加按钮的程序" />
+            app:summary="手动编辑规则"
+            app:title="导入/导出程序按钮跳过的规则" />
 
         <MultiSelectListPreference
             app:key="setting_activity_positions"

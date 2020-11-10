@@ -6,8 +6,10 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.util.Log;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.zfdang.TouchHelperApp;
 
@@ -166,13 +168,20 @@ public class Settings {
         String json = mJson.toJson(mapPackageWidgets);
         return json;
     }
-    public void setPackageWidgetsInString(String value) {
+    public boolean setPackageWidgetsInString(String value) {
         if (value != null) {
-            Type type = new TypeToken<TreeMap<String, Set<PackageWidgetDescription>>>() {}.getType();
-            mapPackageWidgets = mJson.fromJson(value, type);
-            mEditor.putString(PACKAGE_WIDGETS, value);
-            mEditor.apply();
+            try {
+                Type type = new TypeToken<TreeMap<String, Set<PackageWidgetDescription>>>() {
+                }.getType();
+                mapPackageWidgets = mJson.fromJson(value, type);
+                mEditor.putString(PACKAGE_WIDGETS, value);
+                mEditor.apply();
+            } catch (JsonSyntaxException e) {
+                Log.d(TAG, Utilities.getTraceStackInString(e));
+                return false;
+            }
         }
+        return false;
     }
 
     // map of key package positions
