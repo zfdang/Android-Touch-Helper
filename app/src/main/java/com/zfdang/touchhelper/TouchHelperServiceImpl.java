@@ -65,7 +65,7 @@ public class TouchHelperServiceImpl {
     private PackageManager packageManager;
     private String currentPackageName, currentActivityName;
     private String packageName;
-    private Set<String> pkgLaunchers, pkgWhiteList;
+    private Set<String> pkgLaunchers, pkgIMEApps, pkgHomes, pkgWhiteList;
     private List<String> keyWordList;
 
     private Map<String, PackagePositionDescription> mapPackagePositions;
@@ -236,6 +236,12 @@ public class TouchHelperServiceImpl {
                 case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
                     CharSequence tempPkgName = event.getPackageName();
                     CharSequence tempClassName = event.getClassName();
+
+                    if(tempPkgName != null && pkgIMEApps.contains(tempPkgName)) {
+                        // this means IME is started in one app, so we will stop skipping process
+                        // ignore this event;
+                        break;
+                    }
 
                     if(tempPkgName == null || tempClassName == null) {
 //                        currentPackageName = "initial package";
@@ -607,38 +613,37 @@ public class TouchHelperServiceImpl {
 //        Log.d(TAG, "updatePackage");
 
         pkgLaunchers = new HashSet<>();
-//        Set<String> pkgHomes = new HashSet<>();
+        pkgIMEApps = new HashSet<>();
+        pkgHomes = new HashSet<>();
         Set<String> pkgTemps = new HashSet<>();
 
         // find all launchers
         Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
         for (ResolveInfo e : ResolveInfoList) {
-//            Log.d(TAG, "launcher - " + e.activityInfo.packageName);
             pkgLaunchers.add(e.activityInfo.packageName);
         }
         // find all homes
         intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
         ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
         for (ResolveInfo e : ResolveInfoList) {
-////            Log.d(TAG, "homes - " + e.activityInfo.packageName);
-            pkgTemps.add(e.activityInfo.packageName);
+            pkgHomes.add(e.activityInfo.packageName);
         }
         // find all input methods
         List<InputMethodInfo> inputMethodInfoList = ((InputMethodManager) service.getSystemService(AccessibilityService.INPUT_METHOD_SERVICE)).getInputMethodList();
         for (InputMethodInfo e : inputMethodInfoList) {
-////            Log.d(TAG, "IME - " + e.getPackageName());
-            pkgTemps.add(e.getPackageName());
+            pkgIMEApps.add(e.getPackageName());
         }
+
         // ignore some packages in hardcoded way
         // https://support.google.com/a/answer/7292363?hl=en
-        pkgTemps.add(packageName);
+        pkgTemps.add(this.packageName);
         pkgTemps.add("com.android.settings");
 
         // remove whitelist, systems, homes & ad-hoc packages from pkgLaunchers
         pkgLaunchers.removeAll(pkgWhiteList);
-//        pkgLaunchers.removeAll(pkgHomes);
-        pkgLaunchers.removeAll(pkgTemps);
+        pkgLaunchers.removeAll(pkgHomes);
+        pkgLaunchers.removeAll(pkgIMEApps);
 //        Log.d(TAG, "Working List = " + pkgLaunchers.toString());
     }
 
