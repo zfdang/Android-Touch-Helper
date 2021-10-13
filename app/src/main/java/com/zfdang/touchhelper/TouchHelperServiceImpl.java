@@ -24,6 +24,8 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.inputmethod.InputMethodInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -407,7 +409,8 @@ public class TouchHelperServiceImpl {
 
         int total = listA.size();
         int index = 0;
-        while (index < total) {
+        boolean isFind = false;
+        while (index < total && !isFind) {
             AccessibilityNodeInfo node = listA.get(index++);
             if (node != null) {
                 CharSequence description = node.getContentDescription();
@@ -415,7 +418,6 @@ public class TouchHelperServiceImpl {
 
                 // try to find keyword
                 for (String keyword: keyWordList) {
-                    boolean isFind = false;
                     // text or description contains keyword, but not too long （<= length + 6）
                     if (text != null && (text.toString().length() <= keyword.length() + 6 ) && text.toString().contains(keyword)) {
                         isFind = true;
@@ -616,19 +618,19 @@ public class TouchHelperServiceImpl {
             pkgLaunchers.add(e.activityInfo.packageName);
         }
         // find all homes
-//        intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
-//        ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
-//        for (ResolveInfo e : ResolveInfoList) {
+        intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
+        for (ResolveInfo e : ResolveInfoList) {
 ////            Log.d(TAG, "homes - " + e.activityInfo.packageName);
-//            pkgHomes.add(e.activityInfo.packageName);
-//        }
+            pkgTemps.add(e.activityInfo.packageName);
+        }
         // find all input methods
-//        List<InputMethodInfo> inputMethodInfoList = ((InputMethodManager) service.getSystemService(AccessibilityService.INPUT_METHOD_SERVICE)).getInputMethodList();
-//        for (InputMethodInfo e : inputMethodInfoList) {
+        List<InputMethodInfo> inputMethodInfoList = ((InputMethodManager) service.getSystemService(AccessibilityService.INPUT_METHOD_SERVICE)).getInputMethodList();
+        for (InputMethodInfo e : inputMethodInfoList) {
 ////            Log.d(TAG, "IME - " + e.getPackageName());
-//            pkgTemps.add(e.getPackageName());
-//        }
-        // ignore some hardcoded packages
+            pkgTemps.add(e.getPackageName());
+        }
+        // ignore some packages in hardcoded way
         // https://support.google.com/a/answer/7292363?hl=en
         pkgTemps.add(packageName);
         pkgTemps.add("com.android.settings");
