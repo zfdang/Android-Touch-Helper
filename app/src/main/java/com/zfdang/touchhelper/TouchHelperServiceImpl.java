@@ -644,6 +644,7 @@ public class TouchHelperServiceImpl {
         pkgLaunchers.removeAll(pkgWhiteList);
         pkgLaunchers.removeAll(pkgHomes);
         pkgLaunchers.removeAll(pkgIMEApps);
+        pkgLaunchers.removeAll(pkgTemps);
 //        Log.d(TAG, "Working List = " + pkgLaunchers.toString());
     }
 
