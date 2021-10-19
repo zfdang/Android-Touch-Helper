@@ -6,6 +6,7 @@
     <string name="status_title">服务状态</string>
     <string name="text_instructions">\"开屏跳过\"是基于安卓系统的无障碍服务来实现自动跳过广告功能的。为了保证程序能正常工作，请检查以下设置：</string>
     <string name="text_accessibility_permission">1. 请在\"无障碍\"设置里，打开\"开屏跳过 - 无障碍服务\"。</string>
+    <string name="text_optional_hint">-- 以下两项为建议设置 --</string>
     <string name="text_power_permission">2. 请在\"电池优化\"设置里，设置\"开屏跳过\"为\"不优化\"。</string>
     <string name="text_task_manager">3. 请在\"任务管理\"里，锁定\"开屏跳过\"。</string>
     <string name="text_status_help">如有问题，请访问网址:</string>
