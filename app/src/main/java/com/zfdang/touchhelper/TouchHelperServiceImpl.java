@@ -65,7 +65,7 @@ public class TouchHelperServiceImpl {
     private PackageManager packageManager;
     private String currentPackageName, currentActivityName;
     private String packageName;
-    private Set<String> pkgLaunchers, pkgIMEApps, pkgHomes, pkgWhiteList;
+    private Set<String> setPackages, setIMEApps, setHomes, setWhiteList;
     private List<String> keyWordList;
 
     private Map<String, PackagePositionDescription> mapPackagePositions;
@@ -121,7 +121,7 @@ public class TouchHelperServiceImpl {
 //            Log.d(TAG, keyWordList.toString());
 
             // whitelist of packages
-            pkgWhiteList = mSetting.getWhitelistPackages();
+            setWhiteList = mSetting.getWhitelistPackages();
 
             // load pre-defined widgets or positions
             mapPackageWidgets = mSetting.getPackageWidgets();
@@ -169,7 +169,7 @@ public class TouchHelperServiceImpl {
 //                        Log.d(TAG, keyWordList.toString());
                         break;
                     case TouchHelperService.ACTION_REFRESH_PACKAGE:
-                        pkgWhiteList = mSetting.getWhitelistPackages();
+                        setWhiteList = mSetting.getWhitelistPackages();
 //                        Log.d(TAG, pkgWhiteList.toString());
                         updatePackage();
                         break;
@@ -226,50 +226,29 @@ public class TouchHelperServiceImpl {
 //    TYPE_WINDOW_CONTENT_CHANGED - com.android.systemui - android.widget.FrameLayout
 
     // 思路描述：
-    // 1. TYPE_WINDOW_STATE_CHANGED, 判断packageName和activityName
-    // 2. TYPE_WINDOW_CONTENT_CHANGED, 尝试两种方法去跳过广告；如果重复次数超出预设，停止尝试
+    // Window state changed - represents the event of opening a PopupWindow, Menu, Dialog, etc.
+    // Window content changed - represents the event of change in the content of a window. This change can be adding/removing view, changing a view size, etc.
+    // 1. TYPE_WINDOW_STATE_CHANGED, 判断packageName和activityName,决定是否开始跳过检测; 然后使用三种方法去尝试跳过
+    // 2. TYPE_WINDOW_CONTENT_CHANGED, 使用两种方法去尝试跳过
     public void onAccessibilityEvent(AccessibilityEvent event) {
 //        Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName() + " - " + event.getClassName() + "; ");
 //        Log.d(TAG, "    currentPackageName = " + currentPackageName + "  currentActivityName = " + currentActivityName);
+        CharSequence tempPkgName = event.getPackageName();
+        CharSequence tempClassName = event.getClassName();
+        if(tempPkgName == null || tempClassName == null) return;
         try {
             switch (event.getEventType()) {
                 case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
-                    CharSequence tempPkgName = event.getPackageName();
-                    CharSequence tempClassName = event.getClassName();
-
-                    if(tempPkgName == null || tempClassName == null) {
-//                        currentPackageName = "initial package";
-//                        currentActivityName = "initial activity";
-                        break;
-                    }
-
-                    if(pkgIMEApps.contains(tempPkgName)) {
-                        // this means IME is started in one app, don't reset state
-                        // ignore this event;
+                    if(setIMEApps.contains(tempPkgName)) {
+                        // IME might be temporarily started in the package, skip this event
                         break;
                     }
 
                     String pkgName = tempPkgName.toString();
                     final String actName = tempClassName.toString();
-                    boolean isActivity = !actName.startsWith("android.widget.") && !actName.startsWith("android.view.");
+                    boolean isActivity = !actName.startsWith("android.") && !actName.startsWith("androidx.");
 
-                    if(currentPackageName.equals(pkgName)) {
-                        // current package, is it an activity?
-                        if(isActivity) {
-                            // yes, it's an activity
-                            if(!currentActivityName.equals(actName)) {
-                                // new activity in the package, this means this activity is not the first activity any more
-                                // stop skip ad process
-                                // update: there are some cases that ad-activity is not the first activity in the package, so don't not stop skip ad process
-//                                stopSkipAdProcess();
-                                currentActivityName = actName;
-                                break;
-                            } else {
-                                // same package, same activity, but not the first activity any longer
-                                // do nothing here
-                            }
-                        }
-                    } else {
+                    if(!currentPackageName.equals(pkgName)) {
                         // new package, is it a activity?
                         if(isActivity) {
                             // yes, it's an activity
@@ -280,9 +259,22 @@ public class TouchHelperServiceImpl {
                             // stop current skip ad process if it exists
                             stopSkipAdProcess();
 
-                            if(pkgLaunchers.contains(pkgName)) {
+                            if(setPackages.contains(pkgName)) {
                                 // if the package is in our list, start skip ads process
+                                // this is the only place to start skip ad process
                                 startSkipAdProcess();
+                            }
+                        }
+                    } else {
+                        // current package, we just save the activity
+                        if(isActivity) {
+                            // yes, it's an activity
+                            if(!currentActivityName.equals(actName)) {
+                                // new activity in the package, this means this activity is not the first activity any more, stop skip ad process
+                                // update: there are some cases that ad-activity is not the first activity in the package, so don't stop skip ad process
+//                                stopSkipAdProcess();
+                                currentActivityName = actName;
+                                break;
                             }
                         }
                     }
@@ -292,7 +284,7 @@ public class TouchHelperServiceImpl {
 //                        Log.d(TAG, "method by position in STATE_CHANGED");
                         packagePositionDescription = mapPackagePositions.get(currentPackageName);
                         if (packagePositionDescription != null) {
-                            // try multiple times to click the position to skip ads
+                            // the following codes might be run multiple times
                             ShowToastInIntentService("正在根据位置跳过广告...");
                             executorService.scheduleAtFixedRate(new Runnable() {
                                 int num = 0;
@@ -334,8 +326,7 @@ public class TouchHelperServiceImpl {
                     }
                     break;
                 case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:
-                    if (!event.getPackageName().equals(currentPackageName)) {
-                        // do nothing if package name is new
+                    if(!setPackages.contains(tempPkgName)) {
                         break;
                     }
 
@@ -349,8 +340,8 @@ public class TouchHelperServiceImpl {
                         findSkipButtonByTextOrDescription(event.getSource());
                     }
                     break;
-                case AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED:
-                    break;
+//                case AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED:
+//                    break;
             }
         } catch (Throwable e) {
             Log.e(TAG, Utilities.getTraceStackInString(e));
@@ -365,43 +356,6 @@ public class TouchHelperServiceImpl {
             Log.e(TAG, Utilities.getTraceStackInString(e));
         }
     }
-
-    /**
-     * 自动查找启动广告的“跳过”的控件, 这个方法目前没被使用，因为有些控件不设text, 而description里包含了关键字
-     */
-//    private void findSkipButtonByText(AccessibilityNodeInfo nodeInfo) {
-//        if (nodeInfo == null) return;
-//        for (int n = 0; n < keyWordList.size(); n++) {
-//            String keyword = keyWordList.get(n);
-//            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText(keyword);
-//            if (!list.isEmpty()) {
-//                for (AccessibilityNodeInfo e : list) {
-////                    Log.d(TAG, "Find skip-ad by keywords " + e.toString() + " label size = ");
-////                    Utilities.printNodeStack(e);
-//                    // add more validation about the node: 找到的按钮，不能比关键字的长度超出太多
-//                    String label = e.getText().toString();
-//                    if(label != null && label.length() <= keyword.length() + 4){
-////                        Log.d(TAG, "label = " + label + " keyword = " + keyword);
-//                        ShowToastInIntentService("正在根据关键字跳过广告...");
-//
-//                        if (!e.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-//                            if (!e.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-//                                Rect rect = new Rect();
-//                                e.getBoundsInScreen(rect);
-//                                click(rect.centerX(), rect.centerY(), 0, 20);
-//                            }
-//                        }
-//                    }
-//
-//                    e.recycle();
-//                }
-//                b_method_by_button_keyword = false;
-//                return;
-//            }
-//
-//        }
-//        nodeInfo.recycle();
-//    }
 
     /**
      * 查找并点击包含keyword控件，目标包括Text和Description
@@ -436,12 +390,12 @@ public class TouchHelperServiceImpl {
 //                        Log.d(TAG, Utilities.describeAccessibilityNode(node));
 //                        Log.d(TAG, "keyword = " + keyword);
 
-                        if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                            if (!node.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                                Rect rect = new Rect();
-                                node.getBoundsInScreen(rect);
-                                click(rect.centerX(), rect.centerY(), 0, 20);
-                            }
+                        boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+//                        Log.d(TAG, "self clicked = " + clicked);
+                        if (!clicked) {
+                            Rect rect = new Rect();
+                            node.getBoundsInScreen(rect);
+                            click(rect.centerX(), rect.centerY(), 0, 20);
                         }
                         break;
                     }
@@ -612,39 +566,39 @@ public class TouchHelperServiceImpl {
     private void updatePackage() {
 //        Log.d(TAG, "updatePackage");
 
-        pkgLaunchers = new HashSet<>();
-        pkgIMEApps = new HashSet<>();
-        pkgHomes = new HashSet<>();
-        Set<String> pkgTemps = new HashSet<>();
+        setPackages = new HashSet<>();
+        setIMEApps = new HashSet<>();
+        setHomes = new HashSet<>();
+        Set<String> setTemps = new HashSet<>();
 
         // find all launchers
         Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
         for (ResolveInfo e : ResolveInfoList) {
-            pkgLaunchers.add(e.activityInfo.packageName);
+            setPackages.add(e.activityInfo.packageName);
         }
         // find all homes
         intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
         ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
         for (ResolveInfo e : ResolveInfoList) {
-            pkgHomes.add(e.activityInfo.packageName);
+            setHomes.add(e.activityInfo.packageName);
         }
         // find all input methods
         List<InputMethodInfo> inputMethodInfoList = ((InputMethodManager) service.getSystemService(AccessibilityService.INPUT_METHOD_SERVICE)).getInputMethodList();
         for (InputMethodInfo e : inputMethodInfoList) {
-            pkgIMEApps.add(e.getPackageName());
+            setIMEApps.add(e.getPackageName());
         }
 
         // ignore some packages in hardcoded way
         // https://support.google.com/a/answer/7292363?hl=en
-        pkgTemps.add(this.packageName);
-        pkgTemps.add("com.android.settings");
+        setTemps.add(this.packageName);
+        setTemps.add("com.android.settings");
 
         // remove whitelist, systems, homes & ad-hoc packages from pkgLaunchers
-        pkgLaunchers.removeAll(pkgWhiteList);
-        pkgLaunchers.removeAll(pkgHomes);
-        pkgLaunchers.removeAll(pkgIMEApps);
-        pkgLaunchers.removeAll(pkgTemps);
+        setPackages.removeAll(setWhiteList);
+        setPackages.removeAll(setHomes);
+        setPackages.removeAll(setIMEApps);
+        setPackages.removeAll(setTemps);
 //        Log.d(TAG, "Working List = " + pkgLaunchers.toString());
     }
 
