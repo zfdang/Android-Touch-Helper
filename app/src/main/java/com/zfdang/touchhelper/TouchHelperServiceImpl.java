@@ -237,15 +237,15 @@ public class TouchHelperServiceImpl {
                     CharSequence tempPkgName = event.getPackageName();
                     CharSequence tempClassName = event.getClassName();
 
-                    if(tempPkgName != null && pkgIMEApps.contains(tempPkgName)) {
-                        // this means IME is started in one app, so we will stop skipping process
-                        // ignore this event;
-                        break;
-                    }
-
                     if(tempPkgName == null || tempClassName == null) {
 //                        currentPackageName = "initial package";
 //                        currentActivityName = "initial activity";
+                        break;
+                    }
+
+                    if(pkgIMEApps.contains(tempPkgName)) {
+                        // this means IME is started in one app, don't reset state
+                        // ignore this event;
                         break;
                     }
 
@@ -260,7 +260,7 @@ public class TouchHelperServiceImpl {
                             if(!currentActivityName.equals(actName)) {
                                 // new activity in the package, this means this activity is not the first activity any more
                                 // stop skip ad process
-                                // there are some cases that ad-activity is not the first activity in the package
+                                // update: there are some cases that ad-activity is not the first activity in the package, so don't not stop skip ad process
 //                                stopSkipAdProcess();
                                 currentActivityName = actName;
                                 break;
@@ -311,7 +311,7 @@ public class TouchHelperServiceImpl {
                                 }
                             }, packagePositionDescription.delay, packagePositionDescription.period, TimeUnit.MILLISECONDS);
                         } else {
-                            // no customized positions for this activity
+                            // no customized positions for this package, don't try this method again
                             b_method_by_activity_position = false;
                         }
                     }
@@ -323,7 +323,7 @@ public class TouchHelperServiceImpl {
 //                            Log.d(TAG, "Find skip-ad by widget, simulate click ");
                             findSkipButtonByWidget(service.getRootInActiveWindow(), setWidgets);
                         } else {
-                            // no customized widget for this activity
+                            // no customized widget for this package, don't try this method again
                             b_method_by_activity_widget = false;
                         }
                     }
