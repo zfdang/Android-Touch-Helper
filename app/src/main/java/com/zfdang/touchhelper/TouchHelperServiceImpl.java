@@ -45,7 +45,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class TouchHelperServiceImpl {
 
@@ -72,7 +71,6 @@ public class TouchHelperServiceImpl {
     private Map<String, Set<PackageWidgetDescription>> mapPackageWidgets;
     private Set<PackageWidgetDescription> setWidgets;
     private PackagePositionDescription packagePositionDescription;
-    private ReentrantLock toastLock = new ReentrantLock();
 
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
@@ -557,7 +555,6 @@ public class TouchHelperServiceImpl {
         b_method_by_button_keyword = false;
         setWidgets = null;
         packagePositionDescription =  null;
-        if(toastLock.isLocked()){ toastLock.unlock(); }
     }
 
     /**
@@ -873,7 +870,7 @@ public class TouchHelperServiceImpl {
     public void ShowToastInIntentService(final String sText) {
         final Context myContext = this.service;
         // show one toast in 5 seconds only
-        if(mSetting.isSkipAdNotification() && toastLock.tryLock()) {
+        if(mSetting.isSkipAdNotification()) {
             new Handler(Looper.getMainLooper()).post(new Runnable() {
                 @Override
                 public void run() {
