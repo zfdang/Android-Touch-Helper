@@ -122,8 +122,12 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             duration.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                 @Override
                 public boolean onPreferenceChange(Preference preference, Object newValue) {
-                    int value = duration.getValue() + duration.getMin();
-                    mSetting.setSkipAdDuration(value);
+                    try {
+                        int value = (int) newValue;
+                        mSetting.setSkipAdDuration(value);
+                    } catch (ClassCastException e) {
+
+                    }
 
                     return true;
                 }
