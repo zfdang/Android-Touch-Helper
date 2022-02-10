@@ -154,6 +154,8 @@ public class TouchHelperServiceImpl {
         IntentFilter filter_install = new IntentFilter();
         filter_install.addAction(Intent.ACTION_PACKAGE_ADDED);
         filter_install.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        filter_install.addAction(Intent.ACTION_SCREEN_ON);
+        filter_install.addAction(Intent.ACTION_USER_PRESENT);
         filter_install.addDataScheme("package");
         service.registerReceiver(installReceiver, filter_install);
 
@@ -184,6 +186,9 @@ public class TouchHelperServiceImpl {
                         break;
                     case TouchHelperService.ACTION_ACTIVITY_CUSTOMIZATION:
                         showActivityCustomizationDialog();
+                        break;
+                    case TouchHelperService.ACTION_START_SKIPAD:
+                        startSkipAdProcess();
                         break;
                 }
                 return true;

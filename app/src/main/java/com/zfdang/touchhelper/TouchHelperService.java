@@ -12,6 +12,7 @@ public class TouchHelperService extends AccessibilityService {
     public final static int ACTION_REFRESH_CUSTOMIZED_ACTIVITY = 3;
     public final static int ACTION_ACTIVITY_CUSTOMIZATION = 4;
     public final static int ACTION_STOP_SERVICE = 5;
+    public final static int ACTION_START_SKIPAD = 6;
 
     public static TouchHelperServiceImpl serviceImpl = null;
 
