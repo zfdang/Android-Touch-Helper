@@ -151,12 +151,12 @@ public class TouchHelperServiceImpl {
     private void InstallReceiverAndHandler() {
         // install broadcast receiver for package add / remove; device unlock
         installReceiver = new TouchHelperServiceReceiver();
-        IntentFilter filter_install = new IntentFilter();
-        filter_install.addAction(Intent.ACTION_PACKAGE_ADDED);
-        filter_install.addAction(Intent.ACTION_PACKAGE_REMOVED);
-        filter_install.addAction(Intent.ACTION_USER_PRESENT);
-        filter_install.addDataScheme("package");
-        service.registerReceiver(installReceiver, filter_install);
+        IntentFilter actions = new IntentFilter();
+        actions.addAction(Intent.ACTION_PACKAGE_ADDED);
+        actions.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        actions.addAction(Intent.ACTION_USER_PRESENT);
+        actions.addDataScheme("package");
+        service.registerReceiver(installReceiver, actions);
 
         // install handler to handle broadcast messages
         receiverHandler = new Handler(new Handler.Callback() {

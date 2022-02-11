@@ -43,10 +43,10 @@
             android:name=".TouchHelperServiceReceiver"
             android:enabled="true"
             android:exported="true">
-            <intent-filter>
+            <intent-filter android:priority="90000">
                 <action android:name="android.intent.action.PACKAGE_ADDED" />
                 <action android:name="android.intent.action.PACKAGE_REMOVED" />
-<!--                <action android:name="android.intent.action.USER_PRESENT" />-->
+                <action android:name="android.intent.action.USER_PRESENT" />
 <!--                <action android:name="android.intent.action.SCREEN_ON" />-->
                 <data android:scheme="package" />
             </intent-filter>
