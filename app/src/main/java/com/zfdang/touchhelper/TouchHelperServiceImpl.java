@@ -54,7 +54,9 @@ public class TouchHelperServiceImpl {
     private Settings mSetting;
 
     // broadcast receiver handler
-    private TouchHelperServiceReceiver installReceiver;
+    private PackageChangeReceiver packageChangeReceiver;
+    private UserPresentReceiver userPresentReceiver;
+
     public Handler receiverHandler;
 
     private ScheduledExecutorService executorService;
@@ -150,13 +152,14 @@ public class TouchHelperServiceImpl {
 
     private void InstallReceiverAndHandler() {
         // install broadcast receiver for package add / remove; device unlock
-        installReceiver = new TouchHelperServiceReceiver();
+        userPresentReceiver = new UserPresentReceiver();
+        service.registerReceiver(userPresentReceiver, new IntentFilter(Intent.ACTION_USER_PRESENT));
+
+        packageChangeReceiver = new PackageChangeReceiver();
         IntentFilter actions = new IntentFilter();
         actions.addAction(Intent.ACTION_PACKAGE_ADDED);
         actions.addAction(Intent.ACTION_PACKAGE_REMOVED);
-        actions.addAction(Intent.ACTION_USER_PRESENT);
-        actions.addDataScheme("package");
-        service.registerReceiver(installReceiver, actions);
+        service.registerReceiver(packageChangeReceiver, actions);
 
         // install handler to handle broadcast messages
         receiverHandler = new Handler(new Handler.Callback() {
@@ -354,7 +357,8 @@ public class TouchHelperServiceImpl {
 
     public void onUnbind(Intent intent) {
         try {
-            service.unregisterReceiver(installReceiver);
+            service.unregisterReceiver(userPresentReceiver);
+            service.unregisterReceiver(packageChangeReceiver);
         } catch (Throwable e) {
             Log.e(TAG, Utilities.getTraceStackInString(e));
         }
