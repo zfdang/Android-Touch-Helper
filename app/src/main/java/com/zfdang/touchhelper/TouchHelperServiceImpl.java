@@ -190,7 +190,7 @@ public class TouchHelperServiceImpl {
                         showActivityCustomizationDialog();
                         break;
                     case TouchHelperService.ACTION_START_SKIPAD:
-                        Log.d(TAG, "resume from wakeup and start to skip ads now ...");
+//                        Log.d(TAG, "resume from wakeup and start to skip ads now ...");
                         findSkipButtonByTextOrDescription(service.getRootInActiveWindow());
                         break;
                 }
