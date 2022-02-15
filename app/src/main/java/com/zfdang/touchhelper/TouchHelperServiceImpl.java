@@ -67,6 +67,7 @@ public class TouchHelperServiceImpl {
     private String currentPackageName, currentActivityName;
     private String packageName;
     private Set<String> setPackages, setIMEApps, setHomes, setWhiteList;
+    private Set<String> clickedWidgets;
     private List<String> keyWordList;
 
     private Map<String, PackagePositionDescription> mapPackagePositions;
@@ -131,6 +132,9 @@ public class TouchHelperServiceImpl {
             packageManager = service.getPackageManager();
             updatePackage();
 
+            // init clickedWidgets
+            clickedWidgets = new HashSet<String>();
+
             // install receiver and handler for broadcasting events
             InstallReceiverAndHandler();
 
@@ -191,7 +195,7 @@ public class TouchHelperServiceImpl {
                         break;
                     case TouchHelperService.ACTION_START_SKIPAD:
 //                        Log.d(TAG, "resume from wakeup and start to skip ads now ...");
-                        findSkipButtonByTextOrDescription(service.getRootInActiveWindow());
+                        startSkipAdProcess();
                         break;
                 }
                 return true;
@@ -368,6 +372,8 @@ public class TouchHelperServiceImpl {
      * 查找并点击包含keyword控件，目标包括Text和Description
      * * */
     private void findSkipButtonByTextOrDescription(AccessibilityNodeInfo root) {
+//        Log.d(TAG, "findSkipButtonByTextOrDescription triggered: " + Utilities.describeAccessibilityNode(root));
+
         ArrayList<AccessibilityNodeInfo> listA = new ArrayList<>();
         ArrayList<AccessibilityNodeInfo> listB = new ArrayList<>();
         listA.add(root);
@@ -391,12 +397,21 @@ public class TouchHelperServiceImpl {
                     } else if (description != null && (description.toString().length() <= keyword.length() + 6) && description.toString().contains(keyword)) {
                         isFind = true;
                     }
+                    if(isFind) {
+                        // if this node matches our target, stop finding more keywords
+//                        Log.d(TAG, "identify keyword = " + keyword);
+                        break;
+                    }
+                }
 
-                    if (isFind) {
+                // if this node matches our target, try to click it
+                if (isFind) {
+                    String nodeDesc = Utilities.describeAccessibilityNode(node);
+//                    Log.d(TAG, nodeDesc);
+                    if(!clickedWidgets.contains(nodeDesc)){
+                        clickedWidgets.add(nodeDesc);
+
                         ShowToastInIntentService("正在根据关键字跳过广告...");
-//                        Log.d(TAG, Utilities.describeAccessibilityNode(node));
-//                        Log.d(TAG, "keyword = " + keyword);
-
                         boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
 //                        Log.d(TAG, "self clicked = " + clicked);
                         if (!clicked) {
@@ -404,9 +419,16 @@ public class TouchHelperServiceImpl {
                             node.getBoundsInScreen(rect);
                             click(rect.centerX(), rect.centerY(), 0, 20);
                         }
-                        break;
+
+                        // is it possible that there are more nodes to click and this node does not work?
+                        // don't stop looking for more nodes
+//                        break;
+                    } else {
+//                        Log.d(TAG, "Clicked already:" + nodeDesc);
                     }
                 }
+
+                // find all children nodes
                 for (int n = 0; n < node.getChildCount(); n++) {
                     listB.add(node.getChild(n));
                 }
@@ -451,20 +473,26 @@ public class TouchHelperServiceImpl {
                     } else if (cText != null && !e.text.isEmpty() && cText.toString().contains(e.text)) {
                         isFind = true;
                     }
+
                     if (isFind) {
 //                        Log.d(TAG, "Find skip-ad by Widget " + e.toString());
-                        ShowToastInIntentService("正在根据控件跳过广告...");
-                        if (e.onlyClick) {
-                            click(temRect.centerX(), temRect.centerY(), 0, 20);
-                        } else {
-                            if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                                if (!node.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                                    click(temRect.centerX(), temRect.centerY(), 0, 20);
+                        String nodeDesc = Utilities.describeAccessibilityNode(node);
+                        if(!clickedWidgets.contains(nodeDesc)) {
+                            clickedWidgets.add(nodeDesc);
+
+                            ShowToastInIntentService("正在根据控件跳过广告...");
+                            if (e.onlyClick) {
+                                click(temRect.centerX(), temRect.centerY(), 0, 20);
+                            } else {
+                                if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                                    if (!node.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                                        click(temRect.centerX(), temRect.centerY(), 0, 20);
+                                    }
                                 }
                             }
+                            setWidgets = null;
+                            return;
                         }
-                        setWidgets = null;
-                        return;
                     }
                 }
                 for (int n = 0; n < node.getChildCount(); n++) {
@@ -531,6 +559,7 @@ public class TouchHelperServiceImpl {
         b_method_by_button_keyword = true;
         setWidgets = null;
         packagePositionDescription = null;
+        clickedWidgets.clear();
 
         // cancel all methods 4 seconds later
         if( !futureExpireSkipAdProcess.isCancelled() && !futureExpireSkipAdProcess.isDone()) {
