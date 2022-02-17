@@ -75,6 +75,11 @@ public class TouchHelperServiceImpl {
     private Set<PackageWidgetDescription> setWidgets;
     private PackagePositionDescription packagePositionDescription;
 
+    // try to click 5 times, first click after 300ms, and delayed for 500ms for future clicks
+    static final int PackagePositionClickFirstDelay = 300;
+    static final int PackagePositionClickRetryInterval = 500;
+    static final int PackagePositionClickRetry = 5;
+
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
     }
@@ -290,17 +295,22 @@ public class TouchHelperServiceImpl {
                     }
 
                     // now to take different methods to skip ads
+
+                    // first method is to skip ads by position in activity
                     if (b_method_by_activity_position) {
-//                        Log.d(TAG, "method by position in STATE_CHANGED");
+                        // run this method for once only
+                        b_method_by_activity_position = false;
+
                         packagePositionDescription = mapPackagePositions.get(currentPackageName);
                         if (packagePositionDescription != null) {
-                            // the following codes might be run multiple times
                             ShowToastInIntentService("正在根据位置跳过广告...");
+
+                            // try to click the position in the activity for multiple times
                             executorService.scheduleAtFixedRate(new Runnable() {
                                 int num = 0;
                                 @Override
                                 public void run() {
-                                    if (num < packagePositionDescription.number) {
+                                    if (num < PackagePositionClickRetry) {
                                         if(currentActivityName.equals(packagePositionDescription.activityName)) {
                                             // current activity is null, or current activity is the target activity
 //                                            Log.d(TAG, "Find skip-ad by position, simulate click now! ");
@@ -311,10 +321,7 @@ public class TouchHelperServiceImpl {
                                         throw new RuntimeException();
                                     }
                                 }
-                            }, packagePositionDescription.delay, packagePositionDescription.period, TimeUnit.MILLISECONDS);
-                        } else {
-                            // no customized positions for this package, don't try this method again
-                            b_method_by_activity_position = false;
+                            }, PackagePositionClickFirstDelay, PackagePositionClickRetryInterval, TimeUnit.MILLISECONDS);
                         }
                     }
 
@@ -651,7 +658,7 @@ public class TouchHelperServiceImpl {
 
 
         final PackageWidgetDescription widgetDescription = new PackageWidgetDescription();
-        final PackagePositionDescription positionDescription = new PackagePositionDescription("", "", 0, 0, 500, 500, 6);
+        final PackagePositionDescription positionDescription = new PackagePositionDescription("", "", 0, 0);
 
         final LayoutInflater inflater = LayoutInflater.from(service);
         // activity customization view
