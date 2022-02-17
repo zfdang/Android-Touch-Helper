@@ -77,7 +77,7 @@ public class TouchHelperServiceImpl {
     // try to click 5 times, first click after 300ms, and delayed for 500ms for future clicks
     static final int PackagePositionClickFirstDelay = 300;
     static final int PackagePositionClickRetryInterval = 500;
-    static final int PackagePositionClickRetry = 5;
+    static final int PackagePositionClickRetry = 6;
 
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
