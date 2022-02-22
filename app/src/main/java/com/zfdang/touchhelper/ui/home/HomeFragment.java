@@ -94,11 +94,13 @@ public class HomeFragment extends Fragment {
             public void onClick(View v) {
                 //  打开电池优化的界面，让用户设置
                 if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    Intent intent = new Intent();
                     String packageName = getActivity().getPackageName();
-                    PowerManager pm = (PowerManager) getActivity().getSystemService(Context.POWER_SERVICE);
+
                     // open battery optimization setting page
+                    Intent intent = new Intent();
+                    PowerManager pm = (PowerManager) getActivity().getSystemService(Context.POWER_SERVICE);
                     intent.setAction(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+//                    intent.setData(Uri.parse("package:" + packageName));
                     startActivity(intent);
                 }
             }

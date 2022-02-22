@@ -4,12 +4,12 @@
     <string name="title_settings">设置</string>
     <string name="title_about">关于</string>
     <string name="status_title">服务状态</string>
-    <string name="text_instructions">\"开屏跳过\"基于安卓系统的无障碍服务来实现跳过自动广告功能，开源不联网，绝对安全！为了保证程序能正常工作，请检查以下设置：</string>
-    <string name="text_accessibility_permission">1. 请在\"无障碍\"设置里，打开\"开屏跳过 - 无障碍服务\"。</string>
-    <string name="text_optional_hint">-- 以下两项为建议设置 --</string>
-    <string name="text_power_permission">2. 请在\"电池优化\"设置里，设置\"开屏跳过\"为\"不优化\"。</string>
-    <string name="text_task_manager">3. 请在\"任务管理\"里，锁定\"开屏跳过\"。</string>
-    <string name="text_status_help">如有问题，请访问网址:</string>
+    <string name="text_instructions">\"开屏跳过\"基于安卓系统的无障碍服务来实现跳过自动广告功能，开源不联网，绝对安全！为保证程序能正常工作，请检查以下设置：</string>
+    <string name="text_accessibility_permission">1. 在\"无障碍\"设置里，打开\"开屏跳过 - 无障碍服务\"。</string>
+    <string name="text_power_permission">2. 在\"电池优化\"设置里，设置\"开屏跳过\"为\"不优化\"。</string>
+    <string name="text_rom_battery">3. 在电池管理里，设置\"开屏跳过\"为\"允许后台耗电\"。设置方法因品牌不同有所差异，比如VIVO系统为：\"设置\" -> \"电池\" -> \"后台耗电管理\"。</string>
+    <string name="text_task_manager">4. 在\"任务管理\"里，锁定\"开屏跳过\"。</string>
+    <string name="text_status_help">更多信息，请访问网址:</string>
     <string name="text_status_weblink">https://touchhelper.zfdang.com/enable</string>
 
     <string name="button_setting">设置</string>
@@ -26,7 +26,7 @@
     </string>
 
     <string name="about_weblink">https://touchhelper.zfdang.com/</string>
-    <string name="about_copyright">Copyright © 2021 Zhengfa Dang</string>
+    <string name="about_copyright">Copyright © 2022 Zhengfa Dang</string>
 
     <string name="app_version">版本: %s (%d)</string>
 </resources>
