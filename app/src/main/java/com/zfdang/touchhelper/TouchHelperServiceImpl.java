@@ -49,6 +49,8 @@ import java.util.concurrent.TimeUnit;
 public class TouchHelperServiceImpl {
 
     private static final String TAG = "TouchHelperServiceImpl";
+    // this application, quite frequently this app will be clicked un-expectedly
+    private static final String SelfPackageName = "开屏跳过";
     private AccessibilityService service;
 
     private Settings mSetting;
@@ -400,9 +402,9 @@ public class TouchHelperServiceImpl {
                 // try to find keyword
                 for (String keyword: keyWordList) {
                     // text or description contains keyword, but not too long （<= length + 6）
-                    if (text != null && (text.toString().length() <= keyword.length() + 6 ) && text.toString().contains(keyword)) {
+                    if (text != null && (text.toString().length() <= keyword.length() + 6 ) && text.toString().contains(keyword) && !text.toString().equals(SelfPackageName)) {
                         isFind = true;
-                    } else if (description != null && (description.toString().length() <= keyword.length() + 6) && description.toString().contains(keyword)) {
+                    } else if (description != null && (description.toString().length() <= keyword.length() + 6) && description.toString().contains(keyword)  && !text.toString().equals(SelfPackageName)) {
                         isFind = true;
                     }
                     if(isFind) {
