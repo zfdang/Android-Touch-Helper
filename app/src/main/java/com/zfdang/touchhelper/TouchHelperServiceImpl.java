@@ -404,7 +404,7 @@ public class TouchHelperServiceImpl {
                     // text or description contains keyword, but not too long （<= length + 6）
                     if (text != null && (text.toString().length() <= keyword.length() + 6 ) && text.toString().contains(keyword) && !text.toString().equals(SelfPackageName)) {
                         isFind = true;
-                    } else if (description != null && (description.toString().length() <= keyword.length() + 6) && description.toString().contains(keyword)  && !text.toString().equals(SelfPackageName)) {
+                    } else if (description != null && (description.toString().length() <= keyword.length() + 6) && description.toString().contains(keyword)  && !description.toString().equals(SelfPackageName)) {
                         isFind = true;
                     }
                     if(isFind) {
