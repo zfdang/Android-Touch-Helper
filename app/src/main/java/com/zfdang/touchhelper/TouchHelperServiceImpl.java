@@ -562,7 +562,7 @@ public class TouchHelperServiceImpl {
 
         for (int n = 0; n < root.getChildCount(); n++) {
             AccessibilityNodeInfo child = root.getChild(n);
-            dumpChildNodes(child, list, dumpString,indent + "  ");
+            dumpChildNodes(child, list, dumpString,indent + " ");
         }
     }
 
@@ -927,6 +927,8 @@ public class TouchHelperServiceImpl {
                 AccessibilityNodeInfo root = service.getRootInActiveWindow();
                 if (root == null) return;
                 String result = dumpRootNode(root);
+
+                Log.d(TAG, result);
 
                 ClipboardManager clipboard = (ClipboardManager) service.getSystemService(Context.CLIPBOARD_SERVICE);
                 ClipData clip = ClipData.newPlainText("ACTIVITY", result);

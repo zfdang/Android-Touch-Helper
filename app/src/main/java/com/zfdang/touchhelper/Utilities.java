@@ -41,9 +41,9 @@ public class Utilities {
             return "null";
         }
 
-        String result = "AccessibilityNode";
+        String result = "Node";
 
-        result += " Classname=" + e.getClassName().toString();
+        result += " class =" + e.getClassName().toString();
 
         final Rect rect = new Rect();
         e.getBoundsInScreen(rect);
