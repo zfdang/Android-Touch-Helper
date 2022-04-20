@@ -3,6 +3,8 @@ package com.zfdang.touchhelper;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.annotation.SuppressLint;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -546,6 +548,24 @@ public class TouchHelperServiceImpl {
         }
     }
 
+    private String dumpRootNode(AccessibilityNodeInfo root) {
+        ArrayList<AccessibilityNodeInfo> nodeList = new ArrayList<>();
+        StringBuilder dumpString = new StringBuilder();
+        dumpChildNodes(root, nodeList, dumpString, "");
+        return dumpString.toString();
+    }
+
+    private void dumpChildNodes(AccessibilityNodeInfo root, List<AccessibilityNodeInfo> list, StringBuilder dumpString, String indent) {
+        if(root == null) return;
+        list.add(root);
+        dumpString.append(indent + Utilities.describeAccessibilityNode(root) + "\n");
+
+        for (int n = 0; n < root.getChildCount(); n++) {
+            AccessibilityNodeInfo child = root.getChild(n);
+            dumpChildNodes(child, list, dumpString,indent + "  ");
+        }
+    }
+
     /**
      * 模拟点击
      */
@@ -673,6 +693,7 @@ public class TouchHelperServiceImpl {
         final Button btAddWidget = viewCustomization.findViewById(R.id.button_add_widget);
         Button btShowTarget = viewCustomization.findViewById(R.id.button_show_target);
         final Button btAddPosition = viewCustomization.findViewById(R.id.button_add_position);
+        Button btDumpScreen = viewCustomization.findViewById(R.id.button_dump_screen);
         Button btQuit = viewCustomization.findViewById(R.id.button_quit);
 
         final View viewTarget = inflater.inflate(R.layout.layout_accessibility_node_desc, null);
@@ -898,6 +919,20 @@ public class TouchHelperServiceImpl {
                 tvPackageName.setText(positionDescription.packageName + " (以下坐标数据已保存)");
                 // save
                 Settings.getInstance().setPackagePositions(mapPackagePositions);
+            }
+        });
+        btDumpScreen.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                AccessibilityNodeInfo root = service.getRootInActiveWindow();
+                if (root == null) return;
+                String result = dumpRootNode(root);
+
+                ClipboardManager clipboard = (ClipboardManager) service.getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData clip = ClipData.newPlainText("ACTIVITY", result);
+                clipboard.setPrimaryClip(clip);
+
+                ShowToastInIntentService("窗口控件已复制到剪贴板！");
             }
         });
         btQuit.setOnClickListener(new View.OnClickListener() {
