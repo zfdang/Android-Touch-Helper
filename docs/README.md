@@ -34,9 +34,9 @@
 ## 支持作者
 
 <p>
-<img src="alipay5.jpeg" width="250">
-<img src="alipay10.jpeg" width="250">
-<img src="wechatpay.jpeg" width="250">
+<img src="images/alipay.png" width="250">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="images/wechatpay.jpeg" width="250">
 </p>
 
 ## 程序演示和截图
