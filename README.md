@@ -17,6 +17,13 @@
 
 欢迎大家贡献想法和代码！
 
+[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
+     alt="Get it on F-Droid"
+     height="80">](https://f-droid.org/packages/com.zfdang.touchhelper/)
+[<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
+     alt="Get it on Google Play"
+     height="80">](https://play.google.com/store/apps/details?id=com.zfdang.touchhelper)
+
 # 项目网站
 
 [http://TouchHelper.zfdang.com](http://TouchHelper.zfdang.com)
