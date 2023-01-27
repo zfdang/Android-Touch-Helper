@@ -42,10 +42,8 @@ public class HomeFragment extends Fragment {
 
     private HomeViewModel homeViewModel;
 
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             ViewGroup container, Bundle savedInstanceState) {
-        homeViewModel =
-                ViewModelProviders.of(this).get(HomeViewModel.class);
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        homeViewModel = ViewModelProviders.of(this).get(HomeViewModel.class);
         View root = inflater.inflate(R.layout.fragment_home, container, false);
 
         final Drawable drawableYes = ContextCompat.getDrawable(getContext(), R.drawable.ic_right);
@@ -56,7 +54,7 @@ public class HomeFragment extends Fragment {
         homeViewModel.getAccessibilityPermission().observe(getViewLifecycleOwner(), new Observer<Boolean>() {
             @Override
             public void onChanged(Boolean aBoolean) {
-                if(aBoolean) {
+                if (aBoolean) {
                     imageAccessibilityPermission.setImageDrawable(drawableYes);
                 } else {
                     imageAccessibilityPermission.setImageDrawable(drawableNo);
@@ -68,7 +66,7 @@ public class HomeFragment extends Fragment {
         homeViewModel.getPowerOptimization().observe(getViewLifecycleOwner(), new Observer<Boolean>() {
             @Override
             public void onChanged(Boolean aBoolean) {
-                if(aBoolean) {
+                if (aBoolean) {
                     imagePowerPermission.setImageDrawable(drawableYes);
                 } else {
                     imagePowerPermission.setImageDrawable(drawableNo);
@@ -76,6 +74,13 @@ public class HomeFragment extends Fragment {
             }
         });
 
+        final TextView blockCounter = root.findViewById(R.id.block_counter);
+        homeViewModel.getBlockCounter().observe(getViewLifecycleOwner(), new Observer<Integer>() {
+            @Override
+            public void onChanged(Integer integer) {
+                blockCounter.setText(integer.toString());
+            }
+        });
 
         // set listener for buttons
         final ImageButton btAccessibilityPermission = root.findViewById(R.id.button_accessibility_permission);
@@ -93,7 +98,7 @@ public class HomeFragment extends Fragment {
             @Override
             public void onClick(View v) {
                 //  打开电池优化的界面，让用户设置
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     String packageName = getActivity().getPackageName();
 
                     // open battery optimization setting page
@@ -118,11 +123,10 @@ public class HomeFragment extends Fragment {
         super.onResume();
     }
 
-    public void checkServiceStatus(){
+    public void checkServiceStatus() {
 
         // detect the app storage permission
-        boolean bAppPermission =
-                ContextCompat.checkSelfPermission(getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        boolean bAppPermission = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
         MutableLiveData<Boolean> liveData = homeViewModel.getAppPermission();
         liveData.setValue(bAppPermission);
 
@@ -135,5 +139,10 @@ public class HomeFragment extends Fragment {
         boolean hasIgnored = pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
         MutableLiveData<Boolean> power = homeViewModel.getPowerOptimization();
         power.setValue(hasIgnored);
+
+        if (TouchHelperService.serviceImpl != null) {
+            MutableLiveData<Integer> blockCounter = homeViewModel.getBlockCounter();
+            blockCounter.setValue(TouchHelperService.serviceImpl.getSkipCounter());
+        }
     }
 }
