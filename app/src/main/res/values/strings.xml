@@ -13,6 +13,7 @@
     <string name="text_status_weblink">https://touchhelper.zfdang.com/enable</string>
 
     <string name="button_setting">设置</string>
+    <string name="block_counter">已拦截次数</string>
     <string name="touch_helper_service_label">开屏跳过-无障碍服务</string>
     <string name="touch_helper_service_description">\"开屏跳过\"是基于安卓系统的无障碍服务来实现自动跳过广告功能的，为了保证程序能正常工作，打开此服务。\n\n本程序为开源程序，不需要网络权限，不会收集或上传任何个人信息，请放心使用！</string>
     <string name="about_app_introduction">
