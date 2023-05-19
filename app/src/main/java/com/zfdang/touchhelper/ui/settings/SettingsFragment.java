@@ -146,9 +146,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                     mSetting.setKeyWordList(text);
 
                     // notify accessibility to refresh packages
-                    if (TouchHelperService.serviceImpl != null) {
-                        TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_REFRESH_KEYWORDS);
-                    }
+                    TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_KEYWORDS);
 
                     return true;
                 }
@@ -265,9 +263,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                                 mSetting.setWhitelistPackages(pkgWhitelist);
 
                                 // notify accessibility to refresh packages
-                                if (TouchHelperService.serviceImpl != null) {
-                                    TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_REFRESH_PACKAGE);
-                                }
+                                TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_PACKAGE);
 
                                 dialog.dismiss();
                             }
@@ -336,9 +332,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             activity_customization.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
-                    if(TouchHelperService.serviceImpl != null) {
-                        TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_ACTIVITY_CUSTOMIZATION);
-                    } else {
+                    if(!TouchHelperService.dispatchAction(TouchHelperService.ACTION_ACTIVITY_CUSTOMIZATION)) {
                         Toast.makeText(getContext(),"开屏跳过服务未运行，请打开无障碍服务!", Toast.LENGTH_SHORT).show();
                     }
                     return true;
@@ -370,9 +364,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                 updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
 
                 // send message to accessibility service
-                if(TouchHelperService.serviceImpl != null) {
-                    TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
-                }
+                TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
 
                 return true;
             }
@@ -419,9 +411,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                 updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
 
                 // send message to accessibility service
-                if(TouchHelperService.serviceImpl != null) {
-                    TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
-                }
+                TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
 
                 return true;
             }

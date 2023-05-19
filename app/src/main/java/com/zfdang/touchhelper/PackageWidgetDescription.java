@@ -2,9 +2,10 @@ package com.zfdang.touchhelper;
 
 import android.graphics.Rect;
 
+import java.io.Serializable;
 import java.util.Objects;
 
-public class PackageWidgetDescription {
+public class PackageWidgetDescription implements Serializable {
     public String packageName, activityName, className, idName, description, text;
     public Rect position;
     public boolean clickable, onlyClick;

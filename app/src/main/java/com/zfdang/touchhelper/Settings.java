@@ -176,6 +176,7 @@ public class Settings {
                 mapPackageWidgets = mJson.fromJson(value, type);
                 mEditor.putString(PACKAGE_WIDGETS, value);
                 mEditor.apply();
+                return true;
             } catch (JsonSyntaxException e) {
                 Log.d(TAG, Utilities.getTraceStackInString(e));
                 return false;

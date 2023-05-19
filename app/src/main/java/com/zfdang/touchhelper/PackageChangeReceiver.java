@@ -15,9 +15,7 @@ public class PackageChangeReceiver extends BroadcastReceiver {
         String action = intent.getAction();
 //        Log.d(TAG, action);
         if(action.equals(Intent.ACTION_PACKAGE_ADDED) || action.equals(Intent.ACTION_PACKAGE_REMOVED)) {
-            if (TouchHelperService.serviceImpl != null) {
-                TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_REFRESH_PACKAGE);
-            }
+            TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_PACKAGE);
         }
     }
 }

@@ -1,6 +1,8 @@
 package com.zfdang.touchhelper;
 
-public class PackagePositionDescription {
+import java.io.Serializable;
+
+public class PackagePositionDescription implements Serializable {
     public String packageName;
     public String activityName;
     public int x;

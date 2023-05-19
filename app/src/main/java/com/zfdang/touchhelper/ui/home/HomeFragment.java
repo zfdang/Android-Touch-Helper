@@ -128,7 +128,7 @@ public class HomeFragment extends Fragment {
 
         // detect the accessibility permission
         MutableLiveData<Boolean> accessibility = homeViewModel.getAccessibilityPermission();
-        accessibility.setValue(TouchHelperService.serviceImpl != null);
+        accessibility.setValue(TouchHelperService.isServiceRunning());
 
         // detect power optimization
         PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);

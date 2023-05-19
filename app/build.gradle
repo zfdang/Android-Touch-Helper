@@ -26,6 +26,7 @@ android {
         multiDexEnabled true
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        resourceConfigurations = ['zh-rCN']
     }
 
     signingConfigs {
@@ -40,9 +41,18 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
+        }
+    }
+    packagingOptions {
+        jniLibs {
+            excludes += ['pinyindb/*']
+        }
+        resources {
+            excludes += ['pinyindb/*']
         }
     }
 
@@ -56,6 +66,7 @@ android {
             }
         }
     }
+
 
 }
 

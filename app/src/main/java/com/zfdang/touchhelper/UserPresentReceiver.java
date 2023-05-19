@@ -15,9 +15,7 @@ public class UserPresentReceiver extends BroadcastReceiver {
         String action = intent.getAction();
         if(action.equals(Intent.ACTION_USER_PRESENT)) {
             // Sent when the user is present after device wakes up (e.g when the keyguard is gone)
-            if (TouchHelperService.serviceImpl != null) {
-                TouchHelperService.serviceImpl.receiverHandler.sendEmptyMessage(TouchHelperService.ACTION_START_SKIPAD);
-            }
+            TouchHelperService.dispatchAction(TouchHelperService.ACTION_START_SKIPAD);
         }
     }
 }
