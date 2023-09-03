@@ -78,6 +78,7 @@ public class TouchHelperServiceImpl {
     private static final int PACKAGE_POSITION_CLICK_FIRST_DELAY = 300;
     private static final int PACKAGE_POSITION_CLICK_RETRY_INTERVAL = 500;
     private static final int PACKAGE_POSITION_CLICK_RETRY = 6;
+    private boolean isShow = false;
 
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
@@ -693,6 +694,9 @@ public class TouchHelperServiceImpl {
     // display activity customization dialog, and allow users to pick widget or positions
     @SuppressLint("ClickableViewAccessibility")
     private void showActivityCustomizationDialog() {
+        if (isShow){
+            return;
+        }
         // show activity customization window
         final WindowManager windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
         final DisplayMetrics metrics = new DisplayMetrics();
@@ -967,11 +971,13 @@ public class TouchHelperServiceImpl {
                 windowManager.removeViewImmediate(viewTarget);
                 windowManager.removeViewImmediate(viewCustomization);
                 windowManager.removeViewImmediate(imageTarget);
+                isShow = false;
             }
         });
         windowManager.addView(viewTarget, outlineParams);
         windowManager.addView(viewCustomization, customizationParams);
         windowManager.addView(imageTarget, targetParams);
+        isShow = true;
     }
 
     public void ShowToastInIntentService(final String sText) {
