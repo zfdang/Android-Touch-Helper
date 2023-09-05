@@ -28,6 +28,10 @@
 
 [http://TouchHelper.zfdang.com](http://TouchHelper.zfdang.com)
 
+# 一点说明
+这个是几年前搞的一个个人项目，现在没什么精力来改进和维护了，大家提的新需求了，估计很难满足了...
+
+如果有人愿意提交PR, 我会尽量review之后采纳的
 
 # 感谢
 
