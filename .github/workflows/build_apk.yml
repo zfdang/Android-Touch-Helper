@@ -7,8 +7,16 @@ name: Build_TouchHelper_APK
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+      - .github/workflows
+      - 'docs/**'
+      - README.md
   pull_request:
     branches: [ master ]
+    paths-ignore:
+      - .github/workflows
+      - 'docs/**'
+      - README.md
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
