@@ -31,14 +31,6 @@
 2. 从本网站下载：[v2023.05.19](TouchHelper-release-v2023.05.19.apk)
 3. Google Play Store: [开屏跳过](https://play.google.com/store/apps/details?id=com.zfdang.touchhelper)
 
-## 支持作者
-
-<p>
-<img src="images/alipay.png" width="250">
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<img src="images/wechatpay.jpeg" width="250">
-</p>
-
 ## 程序演示和截图
 
 [视频演示](touch_helper.mp4)
