@@ -45,6 +45,8 @@ public class TouchHelperService extends AccessibilityService {
         if (serviceImpl != null) {
             serviceImpl.onInterrupt();
         }
+        Intent restartIntent = new Intent(this, TouchHelperService.class);
+        startService(restartIntent);
     }
 
     @Override
