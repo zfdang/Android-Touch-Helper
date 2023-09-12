@@ -42,9 +42,9 @@ public class TouchHelperService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
-        if (serviceImpl != null) {
-            serviceImpl.onInterrupt();
-        }
+        // if (serviceImpl != null) {
+        //     serviceImpl.onInterrupt();
+        // }
     }
 
     @Override
