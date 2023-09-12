@@ -153,7 +153,7 @@ public class TouchHelperServiceImpl {
     }
 
     public void onInterrupt(){
-        stopSkipAdProcess();
+        // stopSkipAdProcess();
     }
 
     private void InstallReceiverAndHandler() {
