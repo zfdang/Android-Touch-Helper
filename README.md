@@ -39,5 +39,18 @@
 
 https://github.com/LGH1996/AccessibilityTool
 
+# 从源代码编译
+sdk下载和安装:运行.项目根目录下:
+```bash
+# sdk:
+./sdk_setup.sh
+# build:
+./gradlew build
+```
+
+
+
+
+
 
 
