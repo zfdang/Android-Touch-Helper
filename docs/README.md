@@ -73,6 +73,9 @@
 
 [广告跳过高级设置](/settings)
 
+## 赞助声明
+本项目由 [ZMTO](https://zmto.com/) 的「开源项目免费 VPS计划」提供算力支持。 感谢 ZMTO 对开源社区的支持！
+
 ## 发现问题？
 
 请在Github项目页创建Issue:
