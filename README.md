@@ -41,14 +41,15 @@ https://github.com/topics/gkd-subscription
 
 如果有人愿意提交PR, 我会尽量Review之后Merge的
 
-# 赞助声明
-本项目由 [ZMTO](https://zmto.com/) 的「开源项目免费 VPS计划」提供算力支持。 感谢 ZMTO 对开源社区的支持！
-
 # 感谢
 
 项目借鉴了不少AccessibilityTool的代码，在此表示感谢！
 
 https://github.com/LGH1996/AccessibilityTool
 
+# 赞助声明
+本项目由 [ZMTO](https://zmto.com/) 的「开源项目免费 VPS计划」提供算力支持。 感谢 ZMTO 对开源社区的支持！
 
+
+[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
 
