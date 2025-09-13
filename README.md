@@ -7,14 +7,6 @@
 
 自动跳过软件的实现，一般都是基于安卓的Accessibility“无障碍服务”实现。开启了无障碍服务的软件，可以获取屏幕上的任何内容，从而可以检测广告，帮助用户自动跳过。因此，使用广告跳过程序，最大的风险是个人信息被泄露！
 
-```
-推荐另外一款开源软件： 
-https://github.com/gkd-kit/gkd
-
-有不少预制好的规则可以用：
-https://github.com/topics/gkd-subscription
-```
-
 **本程序是开源程序，不需要网络权限，不需要存储权限，不会收集或者上传任何信息！绝无隐私问题！**
 
 程序可以使用三种方法跳过开屏广告：
@@ -36,10 +28,23 @@ https://github.com/topics/gkd-subscription
 
 [http://TouchHelper.zfdang.com](http://TouchHelper.zfdang.com)
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=zfdang/android-touch-helper&type=Date)](https://www.star-history.com/#zfdang/android-touch-helper)
+
+
 # 一点说明
 这是几年前搞的一个个人项目，现在没什么精力来改进和维护了，大家提的新需求了，估计很难满足了...
 
 如果有人愿意提交PR, 我会尽量Review之后Merge的
+
+```
+推荐另外一款开源软件： 
+https://github.com/gkd-kit/gkd
+
+有不少预制好的规则可以用：
+https://github.com/topics/gkd-subscription
+```
 
 # 感谢
 
@@ -48,8 +53,6 @@ https://github.com/topics/gkd-subscription
 https://github.com/LGH1996/AccessibilityTool
 
 # 赞助声明
-
-
 
 [NodeSupport](https://github.com/NodeSeekDev/NodeSupport)赞助了本项目 
 
