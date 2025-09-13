@@ -51,5 +51,3 @@ https://github.com/LGH1996/AccessibilityTool
 本项目由 [ZMTO](https://zmto.com/) 的「开源项目免费 VPS计划」提供算力支持。 感谢 ZMTO 对开源社区的支持！
 
 
-[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
-
