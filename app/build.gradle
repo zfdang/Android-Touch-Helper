@@ -13,12 +13,17 @@ def appVersion = getDate()
 
 
 android {
-    compileSdkVersion 30
+    namespace "com.zfdang.touchhelper"
+    compileSdkVersion 35
+
+    buildFeatures {
+        buildConfig true
+    }
 
     defaultConfig {
         applicationId "com.zfdang.touchhelper"
         minSdkVersion 26
-        targetSdkVersion 30
+        targetSdkVersion 35
         versionCode gitVersion
         versionName appVersion
 
@@ -32,9 +37,9 @@ android {
     signingConfigs {
         release {
             storeFile file("touch_helper.keystore")
-            storePassword "touchhelper"
-            keyAlias "touchhelper"
-            keyPassword "touchhelper"
+            storePassword project.findProperty("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD")
+            keyAlias project.findProperty("KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
+            keyPassword project.findProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
         }
     }
 

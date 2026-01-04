@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Touch Helper | 隐私政策 - 开屏跳过</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.7;
+            color: #333;
+        }
+
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+
+        .highlight {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .date {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+
+        a {
+            color: #3498db;
+        }
+
+        .lang-switch {
+            text-align: right;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .lang-switch button {
+            padding: 8px 16px;
+            margin-left: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .lang-switch button.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .lang-switch button:not(.active) {
+            background: #ddd;
+            color: #333;
+        }
+
+        .lang-switch button:hover:not(.active) {
+            background: #ccc;
+        }
+
+        .content-en,
+        .content-zh {
+            display: none;
+        }
+
+        .content-en.active,
+        .content-zh.active {
+            display: block;
+        }
+
+        hr {
+            margin-top: 40px;
+            border: none;
+            border-top: 1px solid #eee;
+        }
+
+        .footer {
+            text-align: center;
+            color: #7f8c8d;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="lang-switch">
+        <span>Language / 语言:</span>
+        <button id="btn-en" class="active" onclick="switchLang('en')">English</button>
+        <button id="btn-zh" onclick="switchLang('zh')">中文</button>
+    </div>
+
+    <!-- English Content -->
+    <div class="content-en active" id="content-en">
+        <h1>Privacy Policy</h1>
+        <p class="date">Last updated: January 4, 2026</p>
+
+        <div class="highlight">
+            <strong>Summary:</strong> Touch Helper is an open-source application that does NOT collect, store, or
+            transmit any personal data. Your privacy is fully protected.
+        </div>
+
+        <h2>Introduction</h2>
+        <p>Touch Helper ("the App") is a free, open-source Android application designed to help users automatically skip
+            splash screen advertisements. This privacy policy explains how we handle user information.</p>
+
+        <h2>Information We Collect</h2>
+        <p><strong>We do not collect any information.</strong> The App:</p>
+        <ul>
+            <li>Does NOT require network permissions</li>
+            <li>Does NOT connect to any servers</li>
+            <li>Does NOT collect personal data</li>
+            <li>Does NOT track user behavior</li>
+            <li>Does NOT use analytics services</li>
+            <li>Does NOT contain advertisements</li>
+        </ul>
+
+        <h2>Accessibility Service</h2>
+        <p>The App uses Android's Accessibility Service to detect and automatically click "skip" buttons on splash
+            screen advertisements. This service:</p>
+        <ul>
+            <li>Only monitors screen content to identify skip buttons</li>
+            <li>Does NOT record or store any screen content</li>
+            <li>Does NOT transmit any data externally</li>
+            <li>Operates entirely on your device</li>
+        </ul>
+
+        <h2>Data Storage</h2>
+        <p>All app settings and configurations are stored locally on your device. No data is ever uploaded to external
+            servers.</p>
+
+        <h2>Third-Party Services</h2>
+        <p>The App does not integrate any third-party services, SDKs, or analytics tools.</p>
+
+        <h2>Open Source</h2>
+        <p>Touch Helper is fully open source. You can review our source code at: <a
+                href="https://github.com/zfdang/Android-Touch-Helper"
+                target="_blank">https://github.com/zfdang/Android-Touch-Helper</a></p>
+
+        <h2>Children's Privacy</h2>
+        <p>The App does not collect any personal information from anyone, including children under the age of 13.</p>
+
+        <h2>Changes to This Policy</h2>
+        <p>We may update this privacy policy from time to time. Any changes will be posted on this page with an updated
+            revision date.</p>
+
+        <h2>Contact Us</h2>
+        <p>If you have any questions about this privacy policy, please open an issue on our GitHub repository.</p>
+    </div>
+
+    <!-- Chinese Content -->
+    <div class="content-zh" id="content-zh">
+        <h1>隐私政策</h1>
+        <p class="date">最后更新：2026年1月4日</p>
+
+        <div class="highlight">
+            <strong>概要：</strong>开屏跳过是一款开源应用程序，不会收集、存储或传输任何个人数据。您的隐私受到完全保护。
+        </div>
+
+        <h2>简介</h2>
+        <p>开屏跳过（"本应用"）是一款免费、开源的 Android 应用程序，旨在帮助用户自动跳过应用启动时的广告。本隐私政策说明我们如何处理用户信息。</p>
+
+        <h2>我们收集的信息</h2>
+        <p><strong>我们不收集任何信息。</strong>本应用：</p>
+        <ul>
+            <li>不需要网络权限</li>
+            <li>不连接任何服务器</li>
+            <li>不收集个人数据</li>
+            <li>不追踪用户行为</li>
+            <li>不使用分析服务</li>
+            <li>不包含广告</li>
+        </ul>
+
+        <h2>无障碍服务</h2>
+        <p>本应用使用 Android 的无障碍服务来检测并自动点击开屏广告上的"跳过"按钮。此服务：</p>
+        <ul>
+            <li>仅监控屏幕内容以识别跳过按钮</li>
+            <li>不会记录或存储任何屏幕内容</li>
+            <li>不会向外部传输任何数据</li>
+            <li>完全在您的设备上本地运行</li>
+        </ul>
+
+        <h2>数据存储</h2>
+        <p>所有应用设置和配置都存储在您设备的本地。不会有任何数据上传到外部服务器。</p>
+
+        <h2>第三方服务</h2>
+        <p>本应用不集成任何第三方服务、SDK 或分析工具。</p>
+
+        <h2>开源</h2>
+        <p>开屏跳过是完全开源的。您可以在以下地址查看我们的源代码：<a href="https://github.com/zfdang/Android-Touch-Helper"
+                target="_blank">https://github.com/zfdang/Android-Touch-Helper</a></p>
+
+        <h2>儿童隐私</h2>
+        <p>本应用不收集任何人的个人信息，包括13岁以下的儿童。</p>
+
+        <h2>政策变更</h2>
+        <p>我们可能会不时更新本隐私政策。任何变更都将在此页面上发布，并更新修订日期。</p>
+
+        <h2>联系我们</h2>
+        <p>如果您对本隐私政策有任何疑问，请在我们的 GitHub 仓库中提交 Issue。</p>
+    </div>
+
+    <hr>
+    <p class="footer">© 2026 Touch Helper / 开屏跳过. Open Source Software.</p>
+
+    <script>
+        function switchLang(lang) {
+            document.getElementById('content-en').classList.remove('active');
+            document.getElementById('content-zh').classList.remove('active');
+            document.getElementById('btn-en').classList.remove('active');
+            document.getElementById('btn-zh').classList.remove('active');
+
+            document.getElementById('content-' + lang).classList.add('active');
+            document.getElementById('btn-' + lang).classList.add('active');
+
+            localStorage.setItem('privacy-lang', lang);
+        }
+
+        // Load saved language preference
+        const savedLang = localStorage.getItem('privacy-lang');
+        if (savedLang) {
+            switchLang(savedLang);
+        }
+    </script>
+</body>
+
+</html>
