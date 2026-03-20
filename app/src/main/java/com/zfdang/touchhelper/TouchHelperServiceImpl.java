@@ -79,6 +79,7 @@ public class TouchHelperServiceImpl {
     private static final int PACKAGE_POSITION_CLICK_RETRY_INTERVAL = 500;
     private static final int PACKAGE_POSITION_CLICK_RETRY = 6;
     private boolean isShow = false;
+    private long lastContentChangedTime = 0;
 
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
@@ -360,6 +361,12 @@ public class TouchHelperServiceImpl {
                     if(!setPackages.contains(tempPkgName.toString())) {
                         break;
                     }
+
+                    long currentTime = System.currentTimeMillis();
+                    if (currentTime - lastContentChangedTime < 150) {
+                        break;
+                    }
+                    lastContentChangedTime = currentTime;
 
                     if (setTargetedWidgets != null) {
                         if (BuildConfig.DEBUG) {
