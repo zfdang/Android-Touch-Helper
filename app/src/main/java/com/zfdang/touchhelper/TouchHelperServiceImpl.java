@@ -485,15 +485,9 @@ public class TouchHelperServiceImpl {
                 clickedWidgets.add(nodeDesc);
 
                 ShowToastInIntentService("正在根据关键字跳过广告...");
-                boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "self clicked = " + clicked);
-                }
-                if (!clicked) {
-                    Rect rect = new Rect();
-                    node.getBoundsInScreen(rect);
-                    click(rect.centerX(), rect.centerY(), 0, 20);
-                }
+                Rect rect = new Rect();
+                node.getBoundsInScreen(rect);
+                click(rect.centerX(), rect.centerY(), 0, 20);
 
                 // is it possible that there are more nodes to click and this node does not work?
                 return true;
@@ -533,15 +527,8 @@ public class TouchHelperServiceImpl {
                     clickedWidgets.add(nodeDesc);
 
                     ShowToastInIntentService("正在根据控件跳过广告...");
-                    if (e.onlyClick) {
-                        click(temRect.centerX(), temRect.centerY(), 0, 20);
-                    } else {
-                        if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                            if (!node.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                                click(temRect.centerX(), temRect.centerY(), 0, 20);
-                            }
-                        }
-                    }
+                    click(temRect.centerX(), temRect.centerY(), 0, 20);
+
                     // clear setWidgets, stop trying
                     if (setTargetedWidgets == set) setTargetedWidgets = null;
                     return true;
