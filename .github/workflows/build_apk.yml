@@ -33,23 +33,23 @@ jobs:
     - name: checkout codes
       uses: actions/checkout@v4
       with:
-        fetch-depth: '0' # 0 indicates all history, this is needed for git revision 
+        fetch-depth: '0' # 0 indicates all history, this is needed for git revision
 
     - name: Set up JDK
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
         distribution: 'temurin'
+        java-version: '17'
 
     - name: Assemble Release APK
       run: ./gradlew assembleRelease --stacktrace
-  
+
     - name: Upload APK to artifacts
       uses: actions/upload-artifact@v4
       with:
         name: TouchHelper
         path: ./app/build/outputs/apk/
-        
+
     - name: Create ZIPs
       working-directory: ./app/build/outputs/apk/
       run: |
@@ -61,9 +61,13 @@ jobs:
         echo "tag_name=$(($(git rev-list HEAD --count) + 100))" >> $GITHUB_OUTPUT
         echo "release_name=$(($(git rev-list HEAD --count) + 100))" >> $GITHUB_OUTPUT
 
-    - name: Create Release
+    - name: Create Release and Upload APK
       uses: softprops/action-gh-release@v2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
           tag_name: tag-${{ steps.get_git_revision.outputs.tag_name }}
           name: Release ${{ steps.get_git_revision.outputs.release_name }}
+          draft: false
+          prerelease: false
           files: ./app/build/outputs/apk/TouchHelper.zip
