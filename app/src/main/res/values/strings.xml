@@ -26,6 +26,7 @@
     </string>
 
     <string name="about_weblink">https://touchhelper.zfdang.com/</string>
+    <string name="about_privacy">隐私政策 (Privacy Policy):\nhttps://touchhelper.zfdang.com/privacy.html</string>
     <string name="about_copyright">Copyright © 2022 Zhengfa Dang</string>
 
     <string name="app_version">版本: %s (%d)</string>

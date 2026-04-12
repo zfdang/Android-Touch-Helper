@@ -31,7 +31,7 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
-import androidx.lifecycle.ViewModelProviders;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.zfdang.touchhelper.R;
 import com.zfdang.touchhelper.TouchHelperService;
@@ -45,7 +45,7 @@ public class HomeFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         homeViewModel =
-                ViewModelProviders.of(this).get(HomeViewModel.class);
+                new ViewModelProvider(this).get(HomeViewModel.class);
         View root = inflater.inflate(R.layout.fragment_home, container, false);
 
         final Drawable drawableYes = ContextCompat.getDrawable(getContext(), R.drawable.ic_right);
@@ -82,9 +82,16 @@ public class HomeFragment extends Fragment {
         btAccessibilityPermission.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent_abs = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
-                intent_abs.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent_abs);
+                new androidx.appcompat.app.AlertDialog.Builder(getContext())
+                        .setTitle("重要说明 (Prominent Disclosure)")
+                        .setMessage("本应用需要使用无障碍服务（AccessibilityService API）来帮您在其他应用中自动查找并点击屏幕上的指定控件（例如各类重复性的按钮）。\n\n本应用属于自动化工具，所有的点击操作均基于您的配置和触发策略。\n本应用完全离线运行，不会收集、存储、传输或分享您的任何个人数据及敏感信息。\n\n请点击“同意”以继续前往系统设置中授权此服务。")
+                        .setPositiveButton("同意", (dialog, which) -> {
+                            Intent intent_abs = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                            intent_abs.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent_abs);
+                        })
+                        .setNegativeButton("拒绝", null)
+                        .show();
             }
         });
 

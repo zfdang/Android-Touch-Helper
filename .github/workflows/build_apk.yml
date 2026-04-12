@@ -6,7 +6,7 @@ name: Build_TouchHelper_APK
 # events but only for the master branch
 on:
   push:
-    branches: [ master ]
+    branches: [ master, refactor ]
     paths-ignore:
       - .github/workflows
       - 'docs/**'
@@ -41,27 +41,37 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Assemble Release APK
-      run: ./gradlew assembleRelease --stacktrace
+    - name: Assemble Release APK and AAB
+      run: ./gradlew assembleRelease bundleRelease --stacktrace
 
     - name: Upload APK to artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: TouchHelper
+        name: TouchHelper-APK
         path: ./app/build/outputs/apk/
 
+    - name: Upload AAB to artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: TouchHelper-AAB
+        path: ./app/build/outputs/bundle/release/
+
     - name: Create ZIPs
-      working-directory: ./app/build/outputs/apk/
+      if: github.ref == 'refs/heads/master'
+      working-directory: ./app/build/outputs/
       run: |
-        zip -r ./TouchHelper.zip ./release
+        zip -r ./TouchHelper-APK.zip ./apk/release
+        zip -r ./TouchHelper-AAB.zip ./bundle/release
 
     - name: Get git revision
+      if: github.ref == 'refs/heads/master'
       id: get_git_revision
       run: |
         echo "tag_name=$(($(git rev-list HEAD --count) + 100))" >> $GITHUB_OUTPUT
         echo "release_name=$(($(git rev-list HEAD --count) + 100))" >> $GITHUB_OUTPUT
 
     - name: Create Release and Upload APK
+      if: github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v2
       env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -70,4 +80,6 @@ jobs:
           name: Release ${{ steps.get_git_revision.outputs.release_name }}
           draft: false
           prerelease: false
-          files: ./app/build/outputs/apk/TouchHelper.zip
+          files: |
+            ./app/build/outputs/TouchHelper-APK.zip
+            ./app/build/outputs/TouchHelper-AAB.zip
