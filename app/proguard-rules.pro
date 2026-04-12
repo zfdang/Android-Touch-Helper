@@ -54,3 +54,10 @@
 -keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
 
 ##---------------End: proguard configuration for Gson  ----------
+
+##---------------Begin: proguard configuration for Navigation  ----------
+# Keep Navigation component classes and their @Navigator.Name annotations
+# R8 obfuscates Navigator subclasses, breaking reflection-based lookup
+-keep class * extends androidx.navigation.Navigator { *; }
+-keep class androidx.navigation.fragment.NavHostFragment { *; }
+##---------------End: proguard configuration for Navigation  ----------
