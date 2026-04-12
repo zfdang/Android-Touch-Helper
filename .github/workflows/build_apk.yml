@@ -6,7 +6,7 @@ name: Build_TouchHelper_APK
 # events but only for the master branch
 on:
   push:
-    branches: [ master ]
+    branches: [ master, refactor ]
     paths-ignore:
       - .github/workflows
       - 'docs/**'
@@ -57,18 +57,21 @@ jobs:
         path: ./app/build/outputs/bundle/release/
 
     - name: Create ZIPs
+      if: github.ref == 'refs/heads/master'
       working-directory: ./app/build/outputs/
       run: |
         zip -r ./TouchHelper-APK.zip ./apk/release
         zip -r ./TouchHelper-AAB.zip ./bundle/release
 
     - name: Get git revision
+      if: github.ref == 'refs/heads/master'
       id: get_git_revision
       run: |
         echo "tag_name=$(($(git rev-list HEAD --count) + 100))" >> $GITHUB_OUTPUT
         echo "release_name=$(($(git rev-list HEAD --count) + 100))" >> $GITHUB_OUTPUT
 
     - name: Create Release and Upload APK
+      if: github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v2
       env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
