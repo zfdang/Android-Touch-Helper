@@ -91,6 +91,13 @@ public class TouchHelperServiceImpl {
     private static final class ClickSession {
         /** widgets clicked in this process, keyed by clickKey() */
         final Map<String, ClickAttempt> clickedWidgets = new ConcurrentHashMap<>();
+        /** set once a widget rule got its final attempt; widget matching then stops for this process */
+        volatile boolean widgetRulesDone;
+    }
+
+    /** the widget rules still in force for the current process, or null */
+    private Set<PackageWidgetDescription> activeWidgetRules() {
+        return session.widgetRulesDone ? null : setTargetedWidgets;
     }
 
     /**
@@ -470,22 +477,22 @@ public class TouchHelperServiceImpl {
 
                     // third: skip ads by keywords. Both widget and keyword matching share one
                     // traversal of the window; a window state change always gets a full scan.
-                    if (setTargetedWidgets != null || skipAdByKeyword) {
+                    if (activeWidgetRules() != null || skipAdByKeyword) {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "method by keywords in STATE_CHANGED");
                         }
-                        scheduleTraversal(rootOfActiveTargetWindow(), setTargetedWidgets, skipAdByKeyword, true);
+                        scheduleTraversal(rootOfActiveTargetWindow(), activeWidgetRules(), skipAdByKeyword, true);
                     }
                     break;
                 case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:
                     if(!setPackages.contains(tempPkgName.toString())) {
                         break;
                     }
-                    if (setTargetedWidgets != null || skipAdByKeyword) {
+                    if (activeWidgetRules() != null || skipAdByKeyword) {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "method by keywords in CONTENT_CHANGED");
                         }
-                        scheduleTraversal(event.getSource(), setTargetedWidgets, skipAdByKeyword, false);
+                        scheduleTraversal(event.getSource(), activeWidgetRules(), skipAdByKeyword, false);
                     }
                     break;
             }
@@ -662,7 +669,7 @@ public class TouchHelperServiceImpl {
             rescanScheduled = false;
         }
         if (!skipAdRunning) return;
-        Set<PackageWidgetDescription> widgets = setTargetedWidgets;
+        Set<PackageWidgetDescription> widgets = activeWidgetRules();
         if (widgets == null && !skipAdByKeyword) return;
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "rescan active window after evicted sub-trees");
@@ -708,6 +715,9 @@ public class TouchHelperServiceImpl {
         final List<String> keywords = byKeyword ? keyWordList : null;
         // the process this scan belongs to; all click bookkeeping goes to this object only
         final ClickSession session = this.session;
+        if (session.widgetRulesDone) {
+            widgets = null;
+        }
         final ArrayDeque<AccessibilityNodeInfo> queue = new ArrayDeque<>(64);
         queue.add(root);
         final Rect bounds = new Rect();
@@ -992,9 +1002,10 @@ public class TouchHelperServiceImpl {
             // already handled in this process (or not clickable right now), keep looking
             return false;
         }
-        if (result == ClickResult.FINAL && setTargetedWidgets == set) {
-            // the widget got its last attempt, stop looking for widget rules
-            setTargetedWidgets = null;
+        if (result == ClickResult.FINAL) {
+            // the widget got its last attempt: stop looking for widget rules in *this* process
+            // (a newer process that reuses the same rule set keeps them)
+            session.widgetRulesDone = true;
         }
         return true;
     }
@@ -1089,7 +1100,7 @@ public class TouchHelperServiceImpl {
         // widget rules are resolved here instead of waiting for a window-state event
         skipAdByActivityWidget = false;
         setTargetedWidgets = mapPackageWidgets.get(pkg);
-        scheduleTraversal(rootOfActiveTargetWindow(), setTargetedWidgets, skipAdByKeyword, true);
+        scheduleTraversal(rootOfActiveTargetWindow(), activeWidgetRules(), skipAdByKeyword, true);
         scheduleWakeupRescan(pkg);
     }
 
@@ -1100,7 +1111,7 @@ public class TouchHelperServiceImpl {
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "warm start rescan of " + pkg);
                 }
-                scheduleTraversal(rootOfActiveTargetWindow(), setTargetedWidgets, skipAdByKeyword, true);
+                scheduleTraversal(rootOfActiveTargetWindow(), activeWidgetRules(), skipAdByKeyword, true);
             }
         }, WAKEUP_RESCAN_DELAY_MS);
     }

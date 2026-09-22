@@ -53,11 +53,28 @@ public class TouchHelperServiceImplTest {
     public static class RootService extends TouchHelperService {
         AccessibilityNodeInfo activeRoot;
         int rootReads;
+        /**
+         * when set, the gesture path blocks (inside its screen-size lookup, right before
+         * dispatching) until released: simulates a slow gesture on the worker thread
+         */
+        volatile CountDownLatch gestureGate, gestureEntered;
 
         @Override
         public AccessibilityNodeInfo getRootInActiveWindow() {
             rootReads++;
             return activeRoot == null ? null : AccessibilityNodeInfo.obtain(activeRoot);
+        }
+
+        @Override
+        public android.content.res.Resources getResources() {
+            if (Thread.currentThread().getName().startsWith("pool-")) {
+                CountDownLatch entered = gestureEntered, gate = gestureGate;
+                if (entered != null) entered.countDown();
+                if (gate != null) {
+                    try { gate.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+                }
+            }
+            return super.getResources();
         }
     }
 
@@ -101,6 +118,12 @@ public class TouchHelperServiceImplTest {
         Field f = target.getClass().getDeclaredField(name);
         f.setAccessible(true);
         f.set(target, value);
+    }
+
+    private Object activeWidgetRules() throws Exception {
+        java.lang.reflect.Method m = TouchHelperServiceImpl.class.getDeclaredMethod("activeWidgetRules");
+        m.setAccessible(true);
+        return m.invoke(impl);
     }
 
     private boolean skipAdRunning() throws Exception {
@@ -282,7 +305,7 @@ public class TouchHelperServiceImplTest {
         awaitExecutor();
 
         assertEquals(1, closeClicks.get());
-        assertNotNull("widget rules stay active until the widget got its final attempt", get(impl, "setTargetedWidgets"));
+        assertNotNull("widget rules stay active until the widget got its final attempt", activeWidgetRules());
         assertTrue("keyword matching keeps running", skipAdRunning());
     }
 
@@ -462,7 +485,7 @@ public class TouchHelperServiceImplTest {
         awaitExecutor();
         assertEquals(1, skip.get());
         assertEquals(0, other.get());
-        assertNotNull("no widget matched, so widget matching stays active", get(impl, "setTargetedWidgets"));
+        assertNotNull("no widget matched, so widget matching stays active", activeWidgetRules());
     }
 
     private void evictBySpamming(int count) {
@@ -696,13 +719,51 @@ public class TouchHelperServiceImplTest {
         AccessibilityNodeInfo close = node("android.widget.ImageView", null, "com.example.ad:id/close", new Rect(900, 50, 1000, 150), actionClicks);
         impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(close), targets, true);
         assertEquals(1, actionClicks.get());
-        assertNotNull("rules must stay active so the button can be found again", get(impl, "setTargetedWidgets"));
+        assertNotNull("rules must stay active so the button can be found again", activeWidgetRules());
 
         ShadowSystemClock.advanceBy(Duration.ofMillis(600));
         impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(close), targets, true);
         assertEquals(1, actionClicks.get());
         assertEquals("second sighting escalates to a gesture", 1, gestures());
-        assertNull("final attempt made, widget rules are done", get(impl, "setTargetedWidgets"));
+        assertNull("final attempt made, widget rules are done", activeWidgetRules());
+    }
+
+    @Test
+    public void click_finalAttemptOfAnOlderProcessDoesNotDisableTheNewProcessRules() throws Exception {
+        PackageWidgetDescription rule = new PackageWidgetDescription();
+        rule.packageName = AD_PKG;
+        rule.idName = "com.example.ad:id/close";
+        rule.onlyClick = true;
+        Map<String, Set<PackageWidgetDescription>> rules = new HashMap<>();
+        rules.put(AD_PKG, new HashSet<>(Collections.singleton(rule)));
+        set(impl, "mapPackageWidgets", TouchHelperServiceImpl.snapshotWidgets(rules));
+        startSkipAdProcess();
+
+        // first attempt in the old process
+        AccessibilityNodeInfo close = node("android.widget.ImageView", null, "com.example.ad:id/close", new Rect(900, 50, 1000, 150), null);
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, close));
+        awaitExecutor();
+        assertEquals(1, gestures());
+        ShadowSystemClock.advanceBy(Duration.ofMillis(600));
+
+        // the final attempt of the old process blocks inside dispatchGesture ...
+        service.gestureEntered = new CountDownLatch(1);
+        service.gestureGate = new CountDownLatch(1);
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, close));
+        assertTrue(service.gestureEntered.await(5, TimeUnit.SECONDS));
+
+        // ... while the user leaves and re-enters the app: new process, same rule set
+        impl.onAccessibilityEvent(stateChanged("com.example.other", "com.example.other.Main"));
+        startSkipAdProcess();
+        service.gestureGate.countDown();
+        awaitExecutor();
+        assertEquals("the old final gesture went out", 2, gestures());
+
+        assertNotNull("the old FINAL must not switch off the new process' widget rules", activeWidgetRules());
+        // the button of the new ad is still handled by the rule
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, close));
+        awaitExecutor();
+        assertEquals(3, gestures());
     }
 
     @Test
