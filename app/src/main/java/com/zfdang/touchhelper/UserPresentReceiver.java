@@ -13,8 +13,10 @@ public class UserPresentReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         // an Intent broadcast, just dispatch message to TouchHelperService
         String action = intent.getAction();
-        if(action.equals(Intent.ACTION_USER_PRESENT)) {
-            // Sent when the user is present after device wakes up (e.g when the keyguard is gone)
+        // USER_PRESENT: the keyguard is gone; SCREEN_ON: the screen was turned on (devices
+        // without a lock screen never send USER_PRESENT). The service checks that the
+        // foreground app is one we handle before starting anything.
+        if(Intent.ACTION_USER_PRESENT.equals(action) || Intent.ACTION_SCREEN_ON.equals(action)) {
             TouchHelperService.dispatchAction(TouchHelperService.ACTION_START_SKIPAD);
         }
     }

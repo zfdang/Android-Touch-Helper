@@ -3,6 +3,7 @@ package com.zfdang.touchhelper;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.annotation.SuppressLint;
+import android.app.KeyguardManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -15,6 +16,7 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -68,6 +70,13 @@ public class TouchHelperServiceImpl {
 
     private volatile boolean skipAdRunning, skipAdByActivityPosition, skipAdByActivityWidget, skipAdByKeyword;
     private PackageManager packageManager;
+    private KeyguardManager keyguardManager;
+    private PowerManager powerManager;
+    // set when the lock screen (or a dark screen) covered the current target app; the next window
+    // of that app is then a warm start that may show a splash ad. Broadcasts such as USER_PRESENT
+    // are not delivered to third-party apps on every device (OPPO: "oplus skip sp"), so this is
+    // detected from the accessibility events themselves.
+    private volatile boolean wakeupPending;
     // written on the main thread, read on the executor thread
     private volatile String currentPackageName, currentActivityName;
     private String packageName;
@@ -192,6 +201,9 @@ public class TouchHelperServiceImpl {
             packageManager = service.getPackageManager();
             updatePackage();
 
+            keyguardManager = (KeyguardManager) service.getSystemService(Context.KEYGUARD_SERVICE);
+            powerManager = (PowerManager) service.getSystemService(Context.POWER_SERVICE);
+
             clickedWidgets.clear();
 
             // install receiver and handler for broadcasting events
@@ -238,7 +250,11 @@ public class TouchHelperServiceImpl {
     private void InstallReceiverAndHandler() {
         // install broadcast receiver for package add / remove; device unlock
         userPresentReceiver = new UserPresentReceiver();
-        service.registerReceiver(userPresentReceiver, new IntentFilter(Intent.ACTION_USER_PRESENT));
+        // USER_PRESENT is only sent when a keyguard is dismissed; SCREEN_ON covers devices
+        // without a lock screen. Both are protected system broadcasts.
+        IntentFilter wakeup = new IntentFilter(Intent.ACTION_USER_PRESENT);
+        wakeup.addAction(Intent.ACTION_SCREEN_ON);
+        service.registerReceiver(userPresentReceiver, wakeup);
         packageChangeReceiver = new PackageChangeReceiver();
         IntentFilter actions = new IntentFilter();
         actions.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -275,10 +291,7 @@ public class TouchHelperServiceImpl {
                     showActivityCustomizationDialog();
                     break;
                 case TouchHelperService.ACTION_START_SKIPAD:
-                    if (BuildConfig.DEBUG) {
-                        Log.d(TAG, "resume from wakeup and start to skip ads now ...");
-                    }
-                    startSkipAdProcess();
+                    resumeSkipAdAfterWakeup();
                     break;
                 case TouchHelperService.ACTION_STOP_SKIPAD:
                     stopSkipAdProcessInner();
@@ -356,6 +369,7 @@ public class TouchHelperServiceImpl {
                             // since it's an activity in another package, it must be a new activity, save them
                             currentPackageName = pkgName;
                             currentActivityName = actName;
+                            wakeupPending = false;
                             // stop current skip ad process if it exists
                             stopSkipAdProcess();
                             if(setPackages.contains(pkgName)) {
@@ -363,8 +377,28 @@ public class TouchHelperServiceImpl {
                                 // this is the only place to start skip ad process
                                 startSkipAdProcess();
                             }
+                        } else if (!wakeupPending && isScreenLockedOrOff()) {
+                            // a system window (keyguard) covers the current app while the device
+                            // is locked or dark: whatever comes back afterwards is a warm start
+                            if (BuildConfig.DEBUG) {
+                                Log.d(TAG, "lock screen shown over " + currentPackageName + ", expecting a warm start");
+                            }
+                            wakeupPending = true;
                         }
                     } else {
+                        if (wakeupPending) {
+                            wakeupPending = false;
+                            if (setPackages.contains(pkgName)) {
+                                if (BuildConfig.DEBUG) {
+                                    Log.d(TAG, "warm start of " + pkgName + " after the lock screen, start to skip ads");
+                                }
+                                stopSkipAdProcess();
+                                startSkipAdProcess();
+                                // the unlock animation may still own the active window right
+                                // now, so look again once the app has settled
+                                scheduleWakeupRescan(pkgName);
+                            }
+                        }
                         // current package, we just save the activity
                         if(isActivity && !currentActivityName.equals(actName)) {
                             // new activity in the package. Some apps show the ad activity only
@@ -937,6 +971,57 @@ public class TouchHelperServiceImpl {
         GestureDescription.Builder builder = new GestureDescription.Builder()
                 .addStroke(new GestureDescription.StrokeDescription(path, start_time, duration));
         return service.dispatchGesture(builder.build(), null, null);
+    }
+
+    // apps that show a warm-start ad after the screen was unlocked do so within about a second
+    private static final long WAKEUP_RESCAN_DELAY_MS = 1000;
+
+    /**
+     * The screen was turned on or unlocked while an app was in the foreground. Many apps show a
+     * splash ad on such a warm start, so restart the skip-ad process for that app and scan its
+     * window right away and again a moment later (the ad renders after the app resumes).
+     * Nothing happens when the foreground app is not one we handle (launcher, whitelisted app,
+     * keyguard, IME).
+     */
+    private void resumeSkipAdAfterWakeup() {
+        final String pkg = currentPackageName;
+        if (pkg == null || !setPackages.contains(pkg)) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "wakeup while in " + pkg + ", not a target package");
+            }
+            return;
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "wakeup while in " + pkg + ", start to skip ads now ...");
+        }
+        wakeupPending = false;
+        startSkipAdProcess();
+        // widget rules are resolved here instead of waiting for a window-state event
+        skipAdByActivityWidget = false;
+        setTargetedWidgets = mapPackageWidgets.get(pkg);
+        scheduleTraversal(rootOfActiveTargetWindow(), setTargetedWidgets, skipAdByKeyword, true);
+        scheduleWakeupRescan(pkg);
+    }
+
+    /** one more full scan of the app's window a moment after a warm start */
+    private void scheduleWakeupRescan(final String pkg) {
+        receiverHandler.postDelayed(() -> {
+            if (skipAdRunning && pkg.equals(currentPackageName)) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "warm start rescan of " + pkg);
+                }
+                scheduleTraversal(rootOfActiveTargetWindow(), setTargetedWidgets, skipAdByKeyword, true);
+            }
+        }, WAKEUP_RESCAN_DELAY_MS);
+    }
+
+    private boolean isScreenLockedOrOff() {
+        try {
+            return (keyguardManager != null && keyguardManager.isKeyguardLocked())
+                    || (powerManager != null && !powerManager.isInteractive());
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /**

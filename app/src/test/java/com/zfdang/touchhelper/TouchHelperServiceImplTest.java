@@ -7,6 +7,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
+import android.app.KeyguardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Looper;
@@ -661,6 +663,135 @@ public class TouchHelperServiceImplTest {
         startSkipAdProcess();
         impl.iterateNodesToSkipAd(stubbornSkipButton("跳过", actionClicks), null, true);
         assertEquals(2, actionClicks.get());
+    }
+
+    // ------------------------------------------------------------------ wake-up / unlock
+
+    private void broadcast(String action) {
+        new UserPresentReceiver().onReceive(service, new Intent(action));
+        shadowOf(Looper.getMainLooper()).idle();
+    }
+
+    @Test
+    public void wakeup_inTargetAppRestartsTheProcessAndScansTheWindowTwice() throws Exception {
+        // the app was in the foreground, its process finished long ago
+        startSkipAdProcess();
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10));
+        assertFalse(skipAdRunning());
+
+        AtomicInteger clicks = new AtomicInteger();
+        service.activeRoot = keywordTree(new AtomicInteger(), clicks);
+        broadcast(Intent.ACTION_USER_PRESENT);
+        assertTrue(skipAdRunning());
+        awaitExecutor();
+        assertEquals("scanned right away", 1, service.rootReads);
+        assertEquals(1, clicks.get());
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1100));
+        awaitExecutor();
+        assertEquals("and once more a second later", 2, service.rootReads);
+    }
+
+    @Test
+    public void wakeup_alsoReactsToScreenOn() throws Exception {
+        startSkipAdProcess();
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10));
+        assertFalse(skipAdRunning());
+        broadcast(Intent.ACTION_SCREEN_ON);
+        assertTrue(skipAdRunning());
+    }
+
+    @Test
+    public void wakeup_inAnUnhandledAppDoesNothing() throws Exception {
+        // last foreground app is whitelisted / the launcher
+        impl.onAccessibilityEvent(stateChanged("com.example.launcher", "com.example.launcher.Home"));
+        service.activeRoot = keywordTree(new AtomicInteger(), new AtomicInteger());
+        broadcast(Intent.ACTION_USER_PRESENT);
+        assertFalse(skipAdRunning());
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
+        awaitExecutor();
+        assertEquals(0, service.rootReads);
+    }
+
+    @Test
+    public void wakeup_ignoresTheWindowOfAnotherPackage() throws Exception {
+        startSkipAdProcess();
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10));
+        // the keyguard is still the active window when the broadcast arrives
+        AtomicInteger clicks = new AtomicInteger();
+        service.activeRoot = node("com.android.systemui", "android.widget.TextView", "跳过", "keyguard:id/x", new Rect(0, 0, 100, 100), clicks);
+        broadcast(Intent.ACTION_USER_PRESENT);
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
+        awaitExecutor();
+        assertEquals(0, clicks.get());
+    }
+
+    // ------------------------------------------------------------------ warm start detected from events
+
+    private void setKeyguardLocked(boolean locked) {
+        KeyguardManager km = (KeyguardManager) service.getSystemService(Context.KEYGUARD_SERVICE);
+        shadowOf(km).setKeyguardLocked(locked);
+    }
+
+    private void finishProcess() throws Exception {
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10));
+        assertFalse(skipAdRunning());
+    }
+
+    @Test
+    public void warmStart_afterTheLockScreenRestartsTheProcessWithoutAnyBroadcast() throws Exception {
+        startSkipAdProcess();
+        finishProcess();
+
+        // screen off, lock screen shown (a system window that is not an activity), unlock
+        setKeyguardLocked(true);
+        impl.onAccessibilityEvent(stateChanged("com.android.systemui", "android.widget.FrameLayout"));
+        assertFalse(skipAdRunning());
+        setKeyguardLocked(false);
+        AtomicInteger clicks = new AtomicInteger();
+        service.activeRoot = keywordTree(new AtomicInteger(), clicks);
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, AD_ACTIVITY));
+
+        assertTrue(skipAdRunning());
+        awaitExecutor();
+        assertEquals("the returning window is scanned", 1, service.rootReads);
+        assertEquals(1, clicks.get());
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1100));
+        awaitExecutor();
+        assertEquals("and once more a second later", 2, service.rootReads);
+    }
+
+    @Test
+    public void warmStart_isNotTriggeredByTheNotificationShade() throws Exception {
+        startSkipAdProcess();
+        finishProcess();
+        // a system window while the device stays unlocked and interactive (shade, volume panel)
+        setKeyguardLocked(false);
+        impl.onAccessibilityEvent(stateChanged("com.android.systemui", "android.widget.FrameLayout"));
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, AD_ACTIVITY));
+        assertFalse(skipAdRunning());
+        assertEquals(0, service.rootReads);
+    }
+
+    @Test
+    public void warmStart_isNotTriggeredByTheAppsOwnDialogs() throws Exception {
+        startSkipAdProcess();
+        finishProcess();
+        setKeyguardLocked(true); // even with a locked keyguard flag, same-package windows are not a cover
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, "android.widget.FrameLayout"));
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, AD_ACTIVITY));
+        assertFalse(skipAdRunning());
+    }
+
+    @Test
+    public void warmStart_ofAnUnhandledAppDoesNothing() throws Exception {
+        impl.onAccessibilityEvent(stateChanged("com.example.launcher", "com.example.launcher.Home"));
+        setKeyguardLocked(true);
+        impl.onAccessibilityEvent(stateChanged("com.android.systemui", "android.widget.FrameLayout"));
+        setKeyguardLocked(false);
+        impl.onAccessibilityEvent(stateChanged("com.example.launcher", "com.example.launcher.Home"));
+        assertFalse(skipAdRunning());
+        assertEquals(0, service.rootReads);
     }
 
     @Test
