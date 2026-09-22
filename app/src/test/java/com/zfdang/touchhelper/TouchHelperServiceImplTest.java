@@ -746,12 +746,17 @@ public class TouchHelperServiceImplTest {
         });
         impl.onAccessibilityEvent(contentChanged(AD_PKG, slow));
         assertTrue(entered.await(5, TimeUnit.SECONDS));
+        Object oldSession = get(impl, "session");
 
         impl.onAccessibilityEvent(stateChanged("com.example.other", "com.example.other.Main"));
         startSkipAdProcess();               // new process, fresh attempt table
+        Object newSession = get(impl, "session");
         release.countDown();                // old click returns now
         awaitExecutor();
         assertEquals(1, actionClicks.get());
+        // whatever the interleaving, the record lands in the session the scan started under
+        assertEquals(1, ((Map<?, ?>) get(oldSession, "clickedWidgets")).size());
+        assertEquals(0, ((Map<?, ?>) get(newSession, "clickedWidgets")).size());
 
         // the same button in the new ad: first attempt again, not blocked and not a gesture
         impl.iterateNodesToSkipAd(stubbornSkipButton("跳过", actionClicks), null, true);

@@ -83,9 +83,15 @@ public class TouchHelperServiceImpl {
     private volatile Set<String> setPackages = Collections.emptySet();
     private volatile Set<String> setIMEApps = Collections.emptySet();
     private volatile Set<String> setWhiteList = Collections.emptySet();
-    // widgets clicked during the current skip-ad process, keyed by clickKey(); cleared on the
-    // main thread, used on the executor. See clickNode() for the escalation between attempts.
-    private final Map<String, ClickAttempt> clickedWidgets = new ConcurrentHashMap<>();
+    // per-process click state. startSkipAdProcess() installs a fresh session; traversals capture
+    // the session they started under and only ever write to that one, so a click that completes
+    // after the user re-entered the app cannot leak into the new process. See clickNode().
+    private volatile ClickSession session = new ClickSession();
+
+    private static final class ClickSession {
+        /** widgets clicked in this process, keyed by clickKey() */
+        final Map<String, ClickAttempt> clickedWidgets = new ConcurrentHashMap<>();
+    }
 
     /**
      * A widget is clicked at most {@link #MAX_CLICK_ATTEMPTS} times per skip-ad process. The
@@ -96,9 +102,6 @@ public class TouchHelperServiceImpl {
      */
     private static final int MAX_CLICK_ATTEMPTS = 2;
     private static final long CLICK_RETRY_MIN_INTERVAL_MS = 500;
-    // incremented by every startSkipAdProcess(); a traversal or click that started under an
-    // older generation must not touch the state of the new process
-    private volatile int skipAdGeneration;
 
     private static final class ClickAttempt {
         int attempts;
@@ -207,7 +210,7 @@ public class TouchHelperServiceImpl {
             keyguardManager = (KeyguardManager) service.getSystemService(Context.KEYGUARD_SERVICE);
             powerManager = (PowerManager) service.getSystemService(Context.POWER_SERVICE);
 
-            clickedWidgets.clear();
+            session = new ClickSession();
 
             // install receiver and handler for broadcasting events
             InstallReceiverAndHandler();
@@ -703,7 +706,8 @@ public class TouchHelperServiceImpl {
     void iterateNodesToSkipAd(AccessibilityNodeInfo root, Set<PackageWidgetDescription> widgets, boolean byKeyword) {
         if (root == null) return;
         final List<String> keywords = byKeyword ? keyWordList : null;
-        final int generation = skipAdGeneration;
+        // the process this scan belongs to; all click bookkeeping goes to this object only
+        final ClickSession session = this.session;
         final ArrayDeque<AccessibilityNodeInfo> queue = new ArrayDeque<>(64);
         queue.add(root);
         final Rect bounds = new Rect();
@@ -714,19 +718,19 @@ public class TouchHelperServiceImpl {
         boolean handled = false;
         int visited = 0;
         try {
-            while (skipAdRunning && skipAdGeneration == generation) {
+            while (skipAdRunning && this.session == session) {
                 AccessibilityNodeInfo node = queue.poll();
                 if (node == null) break;
                 visited++;
-                if (widgets != null && skipAdByTargetedWidget(node, widgets, bounds)) {
+                if (widgets != null && skipAdByTargetedWidget(node, widgets, bounds, session)) {
                     handled = true;
                     recycleNode(node);
                     break;
                 }
                 boolean isCandidate = false;
-                if (keywords != null && keywordCandidate == null && matchesKeyword(node, keywords)) {
+                if (keywords != null && keywordCandidate == null && matchesKeyword(node, keywords, session)) {
                     if (widgets == null) {
-                        clickKeywordNode(node, keywords);
+                        clickKeywordNode(node, keywords, session);
                         handled = true;
                         recycleNode(node);
                         break;
@@ -745,8 +749,8 @@ public class TouchHelperServiceImpl {
                     recycleNode(node);
                 }
             }
-            if (!handled && keywordCandidate != null && skipAdRunning && skipAdGeneration == generation) {
-                clickKeywordNode(keywordCandidate, keywords);
+            if (!handled && keywordCandidate != null && skipAdRunning && this.session == session) {
+                clickKeywordNode(keywordCandidate, keywords, session);
             }
         } finally {
             recycleNode(keywordCandidate);
@@ -774,7 +778,7 @@ public class TouchHelperServiceImpl {
     /**
      * 判断节点的 Text / Description 是否包含关键字，且尚未在本轮跳过流程中被点击过
      */
-    private boolean matchesKeyword(AccessibilityNodeInfo node, List<String> keywords) {
+    private boolean matchesKeyword(AccessibilityNodeInfo node, List<String> keywords, ClickSession session) {
         CharSequence description = node.getContentDescription();
         CharSequence text = node.getText();
         if ((description == null || description.length() == 0) && (text == null || text.length() == 0)) {
@@ -794,19 +798,19 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "identify keyword = " + keyword);
         }
-        return canClick(clickKey(node));
+        return canClick(clickKey(node), session);
     }
 
     /**
      * 点击包含关键字的控件
      */
-    private void clickKeywordNode(AccessibilityNodeInfo node, final List<String> keywords) {
+    private void clickKeywordNode(AccessibilityNodeInfo node, final List<String> keywords, ClickSession session) {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, Utilities.describeAccessibilityNode(node));
         }
         Rect bounds = new Rect();
         node.getBoundsInScreen(bounds);
-        clickNode(node, bounds, false, "正在根据关键字跳过广告...", refreshed -> {
+        clickNode(node, bounds, false, "正在根据关键字跳过广告...", session, refreshed -> {
             CharSequence text = refreshed.getText();
             CharSequence description = refreshed.getContentDescription();
             return SkipAdRules.findKeyword(text == null ? null : text.toString(),
@@ -830,8 +834,8 @@ public class TouchHelperServiceImpl {
     }
 
     /** whether the widget may be clicked now: not exhausted, and not clicked again too soon */
-    private boolean canClick(String key) {
-        ClickAttempt attempt = clickedWidgets.get(key);
+    private boolean canClick(String key, ClickSession session) {
+        ClickAttempt attempt = session.clickedWidgets.get(key);
         if (attempt == null) return true;
         return attempt.attempts < MAX_CLICK_ATTEMPTS
                 && SystemClock.uptimeMillis() - attempt.lastUptime >= CLICK_RETRY_MIN_INTERVAL_MS;
@@ -857,16 +861,17 @@ public class TouchHelperServiceImpl {
      * that are actually issued count as attempts.
      *
      * @param gestureOnly skip ACTION_CLICK altogether (the "onlyClick" flag of widget rules)
+     * @param session     the process this click belongs to; attempts are recorded there only
      * @param recheck     confirms the rule still matches after the node has been refreshed
      */
-    private ClickResult clickNode(AccessibilityNodeInfo node, Rect bounds, boolean gestureOnly, String toast, Recheck recheck) {
+    private ClickResult clickNode(AccessibilityNodeInfo node, Rect bounds, boolean gestureOnly, String toast,
+                                  ClickSession session, Recheck recheck) {
         String key = clickKey(node);
-        if (!canClick(key)) {
+        if (!canClick(key, session)) {
             return ClickResult.NONE;
         }
-        ClickAttempt attempt = clickedWidgets.get(key);
+        ClickAttempt attempt = session.clickedWidgets.get(key);
         int done = attempt == null ? 0 : attempt.attempts;
-        final int generation = skipAdGeneration;
         boolean useGesture = gestureOnly || done > 0;
         boolean issued;
         if (!useGesture) {
@@ -893,14 +898,11 @@ public class TouchHelperServiceImpl {
         if (!issued) {
             return ClickResult.NONE;
         }
-        if (skipAdGeneration != generation) {
-            // a new skip-ad process started while the click was in flight (the user left and
-            // re-entered the app); its fresh attempt table must not inherit this record
-            return ClickResult.NONE;
-        }
+        // recorded in the session this scan started under: if a new process began while the
+        // click was in flight, this lands in the old, discarded session and never in the new one
         if (attempt == null) {
             attempt = new ClickAttempt();
-            clickedWidgets.put(key, attempt);
+            session.clickedWidgets.put(key, attempt);
         }
         attempt.attempts = done + 1;
         attempt.lastUptime = SystemClock.uptimeMillis();
@@ -958,7 +960,7 @@ public class TouchHelperServiceImpl {
     /**
      * 查找并点击由 ActivityWidgetDescription 定义的控件
      */
-    private boolean skipAdByTargetedWidget(AccessibilityNodeInfo node, Set<PackageWidgetDescription> set, Rect bounds) {
+    private boolean skipAdByTargetedWidget(AccessibilityNodeInfo node, Set<PackageWidgetDescription> set, Rect bounds, ClickSession session) {
         node.getBoundsInScreen(bounds);
         CharSequence cId = node.getViewIdResourceName();
         CharSequence cDescribe = node.getContentDescription();
@@ -976,7 +978,7 @@ public class TouchHelperServiceImpl {
             Log.d(TAG, "Find skip-ad by Widget " + e.toString());
         }
         final PackageWidgetDescription rule = e;
-        ClickResult result = clickNode(node, bounds, e.onlyClick, "正在根据控件跳过广告...", refreshed -> {
+        ClickResult result = clickNode(node, bounds, e.onlyClick, "正在根据控件跳过广告...", session, refreshed -> {
             Rect r = new Rect();
             refreshed.getBoundsInScreen(r);
             CharSequence id = refreshed.getViewIdResourceName();
@@ -1119,14 +1121,13 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Start Skip-ad process");
         }
-        skipAdGeneration++;
+        session = new ClickSession();
         skipAdRunning = true;
         skipAdByActivityPosition = true;
         skipAdByActivityWidget = true;
         skipAdByKeyword = true;
         setTargetedWidgets = null;
         clearPendingScans();
-        clickedWidgets.clear();
 
         // cancel all methods N seconds later
         receiverHandler.removeMessages(TouchHelperService.ACTION_STOP_SKIPAD);
