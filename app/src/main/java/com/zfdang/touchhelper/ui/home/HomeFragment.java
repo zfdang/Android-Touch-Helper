@@ -99,6 +99,20 @@ public class HomeFragment extends Fragment {
     public void onResume() {
         checkServiceStatus();
         super.onResume();
+        // the service was enabled from the system settings (or before the disclosure existed)
+        // but the user has not confirmed the disclosure yet: it stays idle until they do
+        if (TouchHelperService.isServiceRunning()
+                && !com.zfdang.touchhelper.Settings.getInstance().isDisclosureAccepted()) {
+            showAccessibilityDisclosure();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        if (disclosureDialog != null && disclosureDialog.isShowing()) {
+            disclosureDialog.dismiss();
+        }
+        super.onPause();
     }
 
     /**
@@ -107,17 +121,29 @@ public class HomeFragment extends Fragment {
      * does with it, and that nothing leaves the device.
      */
     private void showAccessibilityDisclosure() {
-        if (TouchHelperService.isServiceRunning()) {
+        if (com.zfdang.touchhelper.Settings.getInstance().isDisclosureAccepted()) {
             openAccessibilitySettings();
             return;
         }
-        new AlertDialog.Builder(requireContext())
+        if (disclosureDialog != null && disclosureDialog.isShowing()) {
+            return;
+        }
+        final boolean serviceRunning = TouchHelperService.isServiceRunning();
+        disclosureDialog = new AlertDialog.Builder(requireContext())
                 .setTitle(R.string.accessibility_disclosure_title)
                 .setMessage(R.string.accessibility_disclosure_message)
-                .setPositiveButton(R.string.accessibility_disclosure_agree, (dialog, which) -> openAccessibilitySettings())
+                .setPositiveButton(serviceRunning ? R.string.accessibility_disclosure_agree_only : R.string.accessibility_disclosure_agree,
+                        (dialog, which) -> {
+                            com.zfdang.touchhelper.Settings.getInstance().setDisclosureAccepted(true);
+                            if (!serviceRunning) {
+                                openAccessibilitySettings();
+                            }
+                        })
                 .setNegativeButton(R.string.accessibility_disclosure_cancel, null)
                 .show();
     }
+
+    private AlertDialog disclosureDialog;
 
     private void openAccessibilitySettings() {
         Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);

@@ -46,6 +46,7 @@ public class Settings {
 
         // init all settings from SharedPreferences
         bSkipAdNotification = mPreference.getBoolean(SKIP_AD_NOTIFICATION, true);
+        bDisclosureAccepted = mPreference.getBoolean(ACCESSIBILITY_DISCLOSURE_ACCEPTED, false);
 
         // initial duration of skip ad process
         iSkipAdDuration = mPreference.getInt(SKIP_AD_DURATION, 4);
@@ -106,6 +107,21 @@ public class Settings {
             }
         }
         return pkgSystems;
+    }
+
+    // has the user confirmed the in-app disclosure about what the accessibility service reads?
+    // Google Play requires this consent before the service may process screen content, so the
+    // service stays idle until it is recorded (also for users who enabled the service before
+    // the disclosure existed).
+    private static final String ACCESSIBILITY_DISCLOSURE_ACCEPTED = "ACCESSIBILITY_DISCLOSURE_ACCEPTED";
+    private volatile boolean bDisclosureAccepted;
+    public boolean isDisclosureAccepted() {
+        return bDisclosureAccepted;
+    }
+    public void setDisclosureAccepted(boolean accepted) {
+        bDisclosureAccepted = accepted;
+        mEditor.putBoolean(ACCESSIBILITY_DISCLOSURE_ACCEPTED, accepted);
+        mEditor.apply();
     }
 
     // notification on skip ads?

@@ -352,6 +352,12 @@ public class TouchHelperServiceImpl {
     // 1. TYPE_WINDOW_STATE_CHANGED, 判断packageName和activityName,决定是否开始跳过检测; 然后使用三种方法去尝试跳过
     // 2. TYPE_WINDOW_CONTENT_CHANGED, 使用两种方法去尝试跳过
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (!mSetting.isDisclosureAccepted()) {
+            // no screen content is read or clicked until the user has confirmed the in-app
+            // disclosure; tell them once per process where to do that
+            remindDisclosureOnce();
+            return;
+        }
         if (BuildConfig.DEBUG) {
             Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName() + " - " + event.getClassName() + "; ");
             Log.d(TAG, "    currentPackageName = " + currentPackageName + "  currentActivityName = " + currentActivityName);
@@ -499,6 +505,14 @@ public class TouchHelperServiceImpl {
         } catch (Throwable e) {
             Log.e(TAG, Utilities.getTraceStackInString(e));
         }
+    }
+
+    private boolean disclosureReminderShown;
+
+    private void remindDisclosureOnce() {
+        if (disclosureReminderShown || receiverHandler == null) return;
+        disclosureReminderShown = true;
+        receiverHandler.post(() -> Toast.makeText(service, R.string.accessibility_disclosure_reminder, Toast.LENGTH_LONG).show());
     }
 
     public void onUnbind(Intent intent) {

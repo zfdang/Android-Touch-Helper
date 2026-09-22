@@ -85,6 +85,8 @@ public class TouchHelperServiceImplTest {
     @Before
     public void setUp() throws Exception {
         service = Robolectric.setupService(RootService.class);
+        // the in-app disclosure has been confirmed for all tests but the ones about it
+        Settings.getInstance().setDisclosureAccepted(true);
         service.onServiceConnected();
         impl = (TouchHelperServiceImpl) getFrom(TouchHelperService.class, service, "serviceImpl");
         assertNotNull(impl);
@@ -1023,6 +1025,44 @@ public class TouchHelperServiceImplTest {
         impl.onAccessibilityEvent(stateChanged("com.example.launcher", "com.example.launcher.Home"));
         assertFalse(skipAdRunning());
         assertEquals(0, service.rootReads);
+    }
+
+    // ------------------------------------------------------------------ disclosure gate
+
+    @Test
+    public void service_staysIdleUntilTheDisclosureIsAccepted() throws Exception {
+        Settings.getInstance().setDisclosureAccepted(false);
+        AtomicInteger clicks = new AtomicInteger();
+        service.activeRoot = keywordTree(new AtomicInteger(), clicks);
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, AD_ACTIVITY));
+        assertFalse("no skip-ad process without consent", skipAdRunning());
+        assertEquals("the screen is not read without consent", 0, service.rootReads);
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, keywordTree(new AtomicInteger(), clicks)));
+        awaitExecutor();
+        assertEquals(0, clicks.get());
+        shadowOf(Looper.getMainLooper()).idle();
+        assertEquals("the user is told once where to confirm", 1,
+                org.robolectric.shadows.ShadowToast.shownToastCount());
+
+        // consent recorded: the very next event is handled
+        Settings.getInstance().setDisclosureAccepted(true);
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, AD_ACTIVITY));
+        assertTrue(skipAdRunning());
+        awaitExecutor();
+        assertEquals(1, clicks.get());
+    }
+
+    @Test
+    public void disclosureConsent_isPersisted() throws Exception {
+        Settings settings = Settings.getInstance();
+        // the singleton keeps the SharedPreferences it was created with; read through it
+        android.content.SharedPreferences prefs = (android.content.SharedPreferences) get(settings, "mPreference");
+        settings.setDisclosureAccepted(false);
+        assertFalse(settings.isDisclosureAccepted());
+        assertFalse(prefs.getBoolean("ACCESSIBILITY_DISCLOSURE_ACCEPTED", true));
+        settings.setDisclosureAccepted(true);
+        assertTrue(settings.isDisclosureAccepted());
+        assertTrue(prefs.getBoolean("ACCESSIBILITY_DISCLOSURE_ACCEPTED", false));
     }
 
     @Test
