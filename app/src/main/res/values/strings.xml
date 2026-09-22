@@ -29,4 +29,10 @@
     <string name="about_copyright">Copyright © 2022 Zhengfa Dang</string>
 
     <string name="app_version">版本: %s (%d)</string>
+    <string name="accessibility_disclosure_title">开启无障碍服务前请了解</string>
+    <string name="accessibility_disclosure_message">\"开屏跳过\"通过安卓无障碍服务读取当前屏幕上的界面内容（控件文字、描述和位置），用于识别并自动点击开屏广告的\"跳过\"按钮。\n\n· 自动识别时，这些内容只在本机内存中即时比对，不保存。\n· 当您使用\"添加程序的跳过方法\"时，您所选控件的文字、描述和坐标会作为规则保存在本机的应用数据中，可在设置中查看或删除。\n· 当您使用\"复制窗口控件\"时，当前窗口的控件信息会按您的操作复制到系统剪贴板。\n\n本程序不申请网络权限，不会收集或上传任何数据。同意后即可开启无障碍服务；未同意前服务不会读取任何界面内容。</string>
+    <string name="accessibility_disclosure_agree">同意并前往设置</string>
+    <string name="accessibility_disclosure_agree_only">同意</string>
+    <string name="accessibility_disclosure_reminder">开屏跳过：请打开应用并确认无障碍服务说明后，跳过功能才会开始工作</string>
+    <string name="accessibility_disclosure_cancel">取消</string>
 </resources>
