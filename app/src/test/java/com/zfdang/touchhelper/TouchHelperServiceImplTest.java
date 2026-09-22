@@ -535,6 +535,29 @@ public class TouchHelperServiceImplTest {
     }
 
     @Test
+    public void stateChanged_toAnotherActivityOfTheSamePackageScansTheNewWindow() throws Exception {
+        startSkipAdProcess();
+        // the ad activity shows up after the main activity; its window holds the skip button
+        AtomicInteger clicks = new AtomicInteger();
+        service.activeRoot = keywordTree(new AtomicInteger(), clicks);
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, "com.example.ad.SplashAdActivity"));
+        assertTrue("the process keeps running across activities of the same package", skipAdRunning());
+        awaitExecutor();
+        assertEquals(1, service.rootReads);
+        assertEquals(1, clicks.get());
+    }
+
+    @Test
+    public void stateChanged_activityChangeInAnUnhandledPackageDoesNotScan() throws Exception {
+        service.activeRoot = keywordTree(new AtomicInteger(), new AtomicInteger());
+        impl.onAccessibilityEvent(stateChanged("com.example.other", "com.example.other.Main"));
+        impl.onAccessibilityEvent(stateChanged("com.example.other", "com.example.other.Second"));
+        assertFalse(skipAdRunning());
+        awaitExecutor();
+        assertEquals(0, service.rootReads);
+    }
+
+    @Test
     public void onUnbind_shutsDownWorkerAndStopsProcess() throws Exception {
         startSkipAdProcess();
         service.onUnbind(new Intent());
