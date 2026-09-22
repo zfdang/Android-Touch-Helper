@@ -282,7 +282,7 @@ public class TouchHelperServiceImplTest {
         awaitExecutor();
 
         assertEquals(1, closeClicks.get());
-        assertNull("widget matching should stop after the first hit", get(impl, "setTargetedWidgets"));
+        assertNotNull("widget rules stay active until the widget got its final attempt", get(impl, "setTargetedWidgets"));
         assertTrue("keyword matching keeps running", skipAdRunning());
     }
 
@@ -440,9 +440,8 @@ public class TouchHelperServiceImplTest {
 
         assertEquals("the widget rule wins", 1, closeClicks.get());
         assertEquals("the keyword node is not clicked when a widget rule matched", 0, keywordClicks.get());
-        assertNull(get(impl, "setTargetedWidgets"));
 
-        // with the widget rules satisfied, the keyword path takes over for later events
+        // a later tree without the widget: the keyword path clicks
         impl.onAccessibilityEvent(contentChanged(AD_PKG, keywordTree(new AtomicInteger(), keywordClicks)));
         awaitExecutor();
         assertEquals(1, keywordClicks.get());
@@ -653,6 +652,86 @@ public class TouchHelperServiceImplTest {
     }
 
     @Test
+    public void click_gestureIsNotDispatchedWhenTheWidgetIsGone() throws Exception {
+        startSkipAdProcess();
+        AtomicInteger actionClicks = new AtomicInteger();
+        AccessibilityNodeInfo n = stubbornSkipButton("跳过", actionClicks);
+        impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(n), null, true);
+        assertEquals(1, actionClicks.get());
+
+        // the ad closed in the meantime; a queued snapshot of the button is scanned later
+        ShadowSystemClock.advanceBy(Duration.ofMillis(600));
+        AccessibilityNodeInfo stale = AccessibilityNodeInfo.obtain(n);
+        shadowOf(stale).setRefreshReturnValue(false);
+        impl.iterateNodesToSkipAd(stale, null, true);
+        assertEquals("no gesture at the old coordinates", 0, gestures());
+    }
+
+    @Test
+    public void click_gestureIsNotDispatchedIntoAnotherPackagesWindow() throws Exception {
+        startSkipAdProcess();
+        AtomicInteger actionClicks = new AtomicInteger();
+        AccessibilityNodeInfo n = stubbornSkipButton("跳过", actionClicks);
+        impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(n), null, true);
+        ShadowSystemClock.advanceBy(Duration.ofMillis(600));
+        // after refresh the spot belongs to the launcher
+        n.setPackageName("com.example.launcher");
+        impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(n), null, true);
+        assertEquals(0, gestures());
+    }
+
+    @Test
+    public void click_widgetRuleGetsItsGestureEscalationToo() throws Exception {
+        PackageWidgetDescription rule = new PackageWidgetDescription();
+        rule.packageName = AD_PKG;
+        rule.idName = "com.example.ad:id/close";
+        Map<String, Set<PackageWidgetDescription>> rules = new HashMap<>();
+        rules.put(AD_PKG, new HashSet<>(Collections.singleton(rule)));
+        set(impl, "mapPackageWidgets", TouchHelperServiceImpl.snapshotWidgets(rules));
+        startSkipAdProcess();
+        Set<PackageWidgetDescription> targets = (Set<PackageWidgetDescription>) get(impl, "setTargetedWidgets");
+
+        // ACTION_CLICK is swallowed and the close button (no keyword on it) stays
+        AtomicInteger actionClicks = new AtomicInteger();
+        AccessibilityNodeInfo close = node("android.widget.ImageView", null, "com.example.ad:id/close", new Rect(900, 50, 1000, 150), actionClicks);
+        impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(close), targets, true);
+        assertEquals(1, actionClicks.get());
+        assertNotNull("rules must stay active so the button can be found again", get(impl, "setTargetedWidgets"));
+
+        ShadowSystemClock.advanceBy(Duration.ofMillis(600));
+        impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(close), targets, true);
+        assertEquals(1, actionClicks.get());
+        assertEquals("second sighting escalates to a gesture", 1, gestures());
+        assertNull("final attempt made, widget rules are done", get(impl, "setTargetedWidgets"));
+    }
+
+    @Test
+    public void click_refusedGesturesDoNotConsumeAttempts() throws Exception {
+        PackageWidgetDescription rule = new PackageWidgetDescription();
+        rule.packageName = AD_PKG;
+        rule.idName = "com.example.ad:id/close";
+        rule.onlyClick = true;
+        Map<String, Set<PackageWidgetDescription>> rules = new HashMap<>();
+        rules.put(AD_PKG, new HashSet<>(Collections.singleton(rule)));
+        set(impl, "mapPackageWidgets", TouchHelperServiceImpl.snapshotWidgets(rules));
+        startSkipAdProcess();
+        Set<PackageWidgetDescription> targets = (Set<PackageWidgetDescription>) get(impl, "setTargetedWidgets");
+
+        AccessibilityNodeInfo close = node("android.widget.ImageView", null, "com.example.ad:id/close", new Rect(900, 50, 1000, 150), null);
+        close.setVisibleToUser(false);
+        for (int i = 0; i < 3; i++) {
+            impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(close), targets, true);
+            ShadowSystemClock.advanceBy(Duration.ofMillis(600));
+        }
+        assertEquals(0, gestures());
+
+        // the button becomes visible: it must still get its click
+        close.setVisibleToUser(true);
+        impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(close), targets, true);
+        assertEquals(1, gestures());
+    }
+
+    @Test
     public void click_attemptsAreForgottenByANewProcess() throws Exception {
         startSkipAdProcess();
         AtomicInteger actionClicks = new AtomicInteger();
@@ -759,6 +838,37 @@ public class TouchHelperServiceImplTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1100));
         awaitExecutor();
         assertEquals("and once more a second later", 2, service.rootReads);
+    }
+
+    @Test
+    public void warmStart_waitsUntilTheDeviceIsActuallyUnlocked() throws Exception {
+        startSkipAdProcess();
+        finishProcess();
+        setKeyguardLocked(true);
+        impl.onAccessibilityEvent(stateChanged("com.android.systemui", "android.widget.FrameLayout"));
+        // the app draws a window while the keyguard is still up (e.g. a notification action)
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, "android.widget.FrameLayout"));
+        assertFalse("still locked, nothing to skip yet", skipAdRunning());
+        assertTrue("the warm start is still pending", (Boolean) get(impl, "wakeupPending"));
+
+        setKeyguardLocked(false);
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, AD_ACTIVITY));
+        assertTrue(skipAdRunning());
+    }
+
+    @Test
+    public void wakeup_broadcastWhileLockedDefersToTheReturningWindow() throws Exception {
+        startSkipAdProcess();
+        finishProcess();
+        setKeyguardLocked(true);
+        broadcast(Intent.ACTION_SCREEN_ON);
+        assertFalse("SCREEN_ON with the keyguard up must not start a 4 s process nobody can see", skipAdRunning());
+        assertTrue((Boolean) get(impl, "wakeupPending"));
+
+        // no USER_PRESENT on this device; the app's window comes back after the unlock
+        setKeyguardLocked(false);
+        impl.onAccessibilityEvent(stateChanged(AD_PKG, AD_ACTIVITY));
+        assertTrue(skipAdRunning());
     }
 
     @Test
