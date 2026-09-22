@@ -19,6 +19,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
+import org.robolectric.shadows.ShadowSystemClock;
 import org.robolectric.shadows.ShadowAccessibilityNodeInfo;
 
 import java.lang.reflect.Field;
@@ -38,6 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * {@link AccessibilityNodeInfo} trees under Robolectric.
  */
 @RunWith(RobolectricTestRunner.class)
+@Config(qualifiers = "w1080dp-h2400dp-mdpi")
 public class TouchHelperServiceImplTest {
 
     private static final String AD_PKG = "com.example.ad";
@@ -148,6 +151,7 @@ public class TouchHelperServiceImplTest {
         n.setViewIdResourceName(id);
         n.setBoundsInScreen(bounds);
         n.setClickable(true);
+        n.setVisibleToUser(true);
         if (clicks != null) {
             shadowOf(n).setOnPerformActionListener((action, args) -> {
                 if (action == AccessibilityNodeInfo.ACTION_CLICK) clicks.incrementAndGet();
@@ -555,6 +559,108 @@ public class TouchHelperServiceImplTest {
         assertFalse(skipAdRunning());
         awaitExecutor();
         assertEquals(0, service.rootReads);
+    }
+
+    // ------------------------------------------------------------------ click escalation
+
+    private int gestures() {
+        return shadowOf((android.accessibilityservice.AccessibilityService) service).getGesturesDispatched().size();
+    }
+
+    /** A "跳过" button that swallows ACTION_CLICK (returns true) but never goes away. */
+    private static AccessibilityNodeInfo stubbornSkipButton(String text, AtomicInteger actionClicks) {
+        return node("android.widget.TextView", text, "com.example.ad:id/skip", new Rect(800, 100, 1000, 180), actionClicks);
+    }
+
+    @Test
+    public void click_escalatesToAGestureWhenTheWidgetSurvivesActionClick() throws Exception {
+        startSkipAdProcess();
+        AtomicInteger actionClicks = new AtomicInteger();
+
+        impl.iterateNodesToSkipAd(stubbornSkipButton("跳过 5", actionClicks), null, true);
+        assertEquals(1, actionClicks.get());
+        assertEquals("first attempt is ACTION_CLICK only", 0, gestures());
+
+        // the countdown label changed but it is the same widget; too soon for a retry
+        ShadowSystemClock.advanceBy(Duration.ofMillis(200));
+        impl.iterateNodesToSkipAd(stubbornSkipButton("跳过 4", actionClicks), null, true);
+        assertEquals(1, actionClicks.get());
+        assertEquals(0, gestures());
+
+        // still there half a second later: ACTION_CLICK was a fake success, use a real touch
+        ShadowSystemClock.advanceBy(Duration.ofMillis(400));
+        impl.iterateNodesToSkipAd(stubbornSkipButton("跳过 4", actionClicks), null, true);
+        assertEquals(1, actionClicks.get());
+        assertEquals(1, gestures());
+
+        // and then give up on this widget for the rest of the process
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(1));
+        impl.iterateNodesToSkipAd(stubbornSkipButton("跳过 3", actionClicks), null, true);
+        assertEquals(1, actionClicks.get());
+        assertEquals(1, gestures());
+    }
+
+    @Test
+    public void click_fallsBackToAGestureImmediatelyWhenActionClickIsRejected() throws Exception {
+        startSkipAdProcess();
+        AccessibilityNodeInfo n = node("android.widget.TextView", "跳过", "com.example.ad:id/skip", new Rect(800, 100, 1000, 180), null);
+        shadowOf(n).setOnPerformActionListener((action, args) -> false);
+        impl.iterateNodesToSkipAd(n, null, true);
+        assertEquals(1, gestures());
+    }
+
+    @Test
+    public void click_triesTheParentBeforeAGesture() throws Exception {
+        startSkipAdProcess();
+        AtomicInteger parentClicks = new AtomicInteger();
+        AccessibilityNodeInfo container = node("android.widget.FrameLayout", null, "com.example.ad:id/skip_container", new Rect(790, 90, 1010, 190), parentClicks);
+        AccessibilityNodeInfo label = node("android.widget.TextView", "跳过", null, new Rect(800, 100, 1000, 180), null);
+        shadowOf(label).setOnPerformActionListener((action, args) -> false);
+        shadowOf(container).addChild(label);
+        impl.iterateNodesToSkipAd(container, null, true);
+        assertEquals(1, parentClicks.get());
+        assertEquals(0, gestures());
+    }
+
+    @Test
+    public void click_neverDispatchesAGestureAtInvalidCoordinates() throws Exception {
+        startSkipAdProcess();
+        // not laid out yet: empty bounds at the origin, and ACTION_CLICK is rejected
+        AccessibilityNodeInfo n = node("android.widget.TextView", "跳过", "com.example.ad:id/skip", new Rect(0, 0, 0, 0), null);
+        shadowOf(n).setOnPerformActionListener((action, args) -> false);
+        impl.iterateNodesToSkipAd(n, null, true);
+        assertEquals("a tap at (0,0) would hit the status bar", 0, gestures());
+    }
+
+    @Test
+    public void click_widgetRuleWithOnlyClickUsesAGestureRightAway() throws Exception {
+        PackageWidgetDescription rule = new PackageWidgetDescription();
+        rule.packageName = AD_PKG;
+        rule.idName = "com.example.ad:id/close";
+        rule.onlyClick = true;
+        Map<String, Set<PackageWidgetDescription>> rules = new HashMap<>();
+        rules.put(AD_PKG, new HashSet<>(Collections.singleton(rule)));
+        set(impl, "mapPackageWidgets", TouchHelperServiceImpl.snapshotWidgets(rules));
+        startSkipAdProcess();
+
+        AtomicInteger actionClicks = new AtomicInteger();
+        AccessibilityNodeInfo close = node("android.widget.ImageView", null, "com.example.ad:id/close", new Rect(900, 50, 1000, 150), actionClicks);
+        impl.iterateNodesToSkipAd(close, (Set<PackageWidgetDescription>) get(impl, "setTargetedWidgets"), true);
+        assertEquals(0, actionClicks.get());
+        assertEquals(1, gestures());
+    }
+
+    @Test
+    public void click_attemptsAreForgottenByANewProcess() throws Exception {
+        startSkipAdProcess();
+        AtomicInteger actionClicks = new AtomicInteger();
+        impl.iterateNodesToSkipAd(stubbornSkipButton("跳过", actionClicks), null, true);
+        assertEquals(1, actionClicks.get());
+
+        impl.onAccessibilityEvent(stateChanged("com.example.other", "com.example.other.Main"));
+        startSkipAdProcess();
+        impl.iterateNodesToSkipAd(stubbornSkipButton("跳过", actionClicks), null, true);
+        assertEquals(2, actionClicks.get());
     }
 
     @Test

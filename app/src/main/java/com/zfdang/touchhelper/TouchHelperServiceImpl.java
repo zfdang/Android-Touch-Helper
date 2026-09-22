@@ -74,8 +74,24 @@ public class TouchHelperServiceImpl {
     private volatile Set<String> setPackages = Collections.emptySet();
     private volatile Set<String> setIMEApps = Collections.emptySet();
     private volatile Set<String> setWhiteList = Collections.emptySet();
-    // widgets clicked during the current skip-ad process; cleared on the main thread, used on the executor
-    private final Set<String> clickedWidgets = ConcurrentHashMap.newKeySet();
+    // widgets clicked during the current skip-ad process, keyed by clickKey(); cleared on the
+    // main thread, used on the executor. See clickNode() for the escalation between attempts.
+    private final Map<String, ClickAttempt> clickedWidgets = new ConcurrentHashMap<>();
+
+    /**
+     * A widget is clicked at most {@link #MAX_CLICK_ATTEMPTS} times per skip-ad process. The
+     * first attempt uses ACTION_CLICK, which cannot hit anything but the widget itself but is
+     * ignored by some ad SDKs (performAction() returns true although nothing happens). If the
+     * same widget is still on screen {@link #CLICK_RETRY_MIN_INTERVAL_MS} later, the second
+     * attempt is a real touch gesture at the widget's centre.
+     */
+    private static final int MAX_CLICK_ATTEMPTS = 2;
+    private static final long CLICK_RETRY_MIN_INTERVAL_MS = 500;
+
+    private static final class ClickAttempt {
+        int attempts;
+        long lastUptime;
+    }
     private volatile List<String> keyWordList = Collections.emptyList();
 
     // immutable snapshots of the user rules, replaced wholesale when settings change
@@ -739,31 +755,103 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "identify keyword = " + keyword);
         }
-        return !clickedWidgets.contains(Utilities.describeAccessibilityNode(node));
+        return canClick(clickKey(node));
     }
 
     /**
      * 点击包含关键字的控件
      */
     private void clickKeywordNode(AccessibilityNodeInfo node) {
-        String nodeDesc = Utilities.describeAccessibilityNode(node);
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, nodeDesc);
+            Log.d(TAG, Utilities.describeAccessibilityNode(node));
         }
-        if (!clickedWidgets.add(nodeDesc)) {
-            // already clicked this widget in this skip-ad process
-            return;
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        clickNode(node, bounds, false, "正在根据关键字跳过广告...");
+    }
+
+    /**
+     * Identity of a widget within one skip-ad process: class, view id and screen bounds. The
+     * text is left out on purpose so that a countdown label ("跳过 5" → "跳过 4") stays the same
+     * widget and its click attempts are counted together.
+     */
+    private static String clickKey(AccessibilityNodeInfo node) {
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        StringBuilder key = new StringBuilder(96);
+        key.append(node.getClassName()).append('|').append(node.getViewIdResourceName()).append('|')
+                .append(bounds.left).append(',').append(bounds.top).append(',')
+                .append(bounds.right).append(',').append(bounds.bottom);
+        return key.toString();
+    }
+
+    /** whether the widget may be clicked now: not exhausted, and not clicked again too soon */
+    private boolean canClick(String key) {
+        ClickAttempt attempt = clickedWidgets.get(key);
+        if (attempt == null) return true;
+        return attempt.attempts < MAX_CLICK_ATTEMPTS
+                && SystemClock.uptimeMillis() - attempt.lastUptime >= CLICK_RETRY_MIN_INTERVAL_MS;
+    }
+
+    /**
+     * Click a matched widget, escalating from ACTION_CLICK to a touch gesture when the widget
+     * is still on screen at the next sighting (see {@link #MAX_CLICK_ATTEMPTS}).
+     *
+     * @param gestureOnly skip ACTION_CLICK altogether (the "onlyClick" flag of widget rules)
+     * @return true when a click was issued
+     */
+    private boolean clickNode(AccessibilityNodeInfo node, Rect bounds, boolean gestureOnly, String toast) {
+        String key = clickKey(node);
+        if (!canClick(key)) {
+            return false;
         }
-        ShowToastInIntentService("正在根据关键字跳过广告...");
-        boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        ClickAttempt attempt = clickedWidgets.get(key);
+        if (attempt == null) {
+            attempt = new ClickAttempt();
+            clickedWidgets.put(key, attempt);
+        }
+        attempt.attempts++;
+        attempt.lastUptime = SystemClock.uptimeMillis();
+        ShowToastInIntentService(toast);
+
+        if (!gestureOnly && attempt.attempts == 1) {
+            boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+            if (!clicked) {
+                // the label itself is often not clickable, its container is
+                AccessibilityNodeInfo parent = node.getParent();
+                if (parent != null) {
+                    clicked = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    recycleNode(parent);
+                }
+            }
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "self clicked = " + clicked);
+            }
+            if (clicked) {
+                return true;
+            }
+        }
+        return clickByGesture(node, bounds);
+    }
+
+    /** Touch gesture at the centre of {@code bounds}, only when that point is a visible spot on screen. */
+    private boolean clickByGesture(AccessibilityNodeInfo node, Rect bounds) {
+        DisplayMetrics metrics = service.getResources().getDisplayMetrics();
+        int x = bounds.centerX(), y = bounds.centerY();
+        boolean onScreen = !bounds.isEmpty() && x >= 0 && y >= 0
+                && (metrics.widthPixels <= 0 || x < metrics.widthPixels)
+                && (metrics.heightPixels <= 0 || y < metrics.heightPixels);
+        if (!onScreen || !node.isVisibleToUser()) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "gesture click skipped, widget not on screen: " + bounds.toShortString());
+            }
+            return false;
+        }
+        boolean dispatched = click(x, y, 0, 20);
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "self clicked = " + clicked);
+            Log.d(TAG, "gesture clicked at (" + x + ", " + y + ") dispatched = " + dispatched);
         }
-        if (!clicked) {
-            Rect rect = new Rect();
-            node.getBoundsInScreen(rect);
-            click(rect.centerX(), rect.centerY(), 0, 20);
-        }
+        return dispatched;
     }
 
     /**
@@ -786,24 +874,9 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Find skip-ad by Widget " + e.toString());
         }
-        String nodeDesc = Utilities.describeAccessibilityNode(node);
-        if (!clickedWidgets.add(nodeDesc)) {
-            // avoid multiple click on the same widget
+        if (!clickNode(node, bounds, e.onlyClick, "正在根据控件跳过广告...")) {
+            // already handled in this process (or not clickable right now), keep looking
             return false;
-        }
-        ShowToastInIntentService("正在根据控件跳过广告...");
-        if (e.onlyClick) {
-            click(bounds.centerX(), bounds.centerY(), 0, 20);
-        } else if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            AccessibilityNodeInfo parent = node.getParent();
-            boolean parentClicked = false;
-            if (parent != null) {
-                parentClicked = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                recycleNode(parent);
-            }
-            if (!parentClicked) {
-                click(bounds.centerX(), bounds.centerY(), 0, 20);
-            }
         }
         // clear setWidgets, stop trying
         if (setTargetedWidgets == set) setTargetedWidgets = null;
