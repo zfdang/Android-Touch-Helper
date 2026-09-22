@@ -350,15 +350,15 @@ public class TouchHelperServiceImpl {
                         }
                     } else {
                         // current package, we just save the activity
-                        if(isActivity) {
-                            // yes, it's an activity
-                            if(!currentActivityName.equals(actName)) {
-                                // new activity in the package, this means this activity is not the first activity any more, stop skip ad process
-                                // update: there are some cases that ad-activity is not the first activity in the package, so don't stop skip ad process
-//                                stopSkipAdProcess();
-                                currentActivityName = actName;
-                                break;
+                        if(isActivity && !currentActivityName.equals(actName)) {
+                            // new activity in the package. Some apps show the ad activity only
+                            // after their main activity (e.g. a splash-ad activity started from
+                            // the home screen), so the skip-ad process keeps running and the new
+                            // window gets a full scan below, just like the first activity did.
+                            if (BuildConfig.DEBUG) {
+                                Log.d(TAG, "activity changed within package, scanning new window");
                             }
+                            currentActivityName = actName;
                         }
                     }
 
@@ -724,6 +724,10 @@ public class TouchHelperServiceImpl {
         CharSequence text = node.getText();
         if ((description == null || description.length() == 0) && (text == null || text.length() == 0)) {
             return false;
+        }
+        if (BuildConfig.DEBUG) {
+            // labelled nodes only; helps to see what an ad screen exposes when no keyword matches
+            Log.d(TAG, "labelled node text=" + text + " desc=" + description + " id=" + node.getViewIdResourceName());
         }
         String keyword = SkipAdRules.findKeyword(
                 text == null ? null : text.toString(),
