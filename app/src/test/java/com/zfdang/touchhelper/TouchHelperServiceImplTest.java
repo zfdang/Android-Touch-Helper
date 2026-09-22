@@ -88,9 +88,18 @@ public class TouchHelperServiceImplTest {
         return impl.pendingScanCount();
     }
 
-    /** Waits until every traversal queued so far has finished. */
+    /**
+     * Waits until every traversal queued so far has finished. The drain processes one sub-tree
+     * per executor task and re-submits itself, so keep waiting until the queue is empty and
+     * then once more for the scan that may still be running.
+     */
     private void awaitExecutor() throws Exception {
+        long deadline = System.currentTimeMillis() + 5000;
+        while (pendingTraversals() > 0 && System.currentTimeMillis() < deadline) {
+            executor.submit(() -> { }).get(5, TimeUnit.SECONDS);
+        }
         executor.submit(() -> { }).get(5, TimeUnit.SECONDS);
+        assertEquals("traversal backlog did not drain in time", 0, pendingTraversals());
     }
 
     private static AccessibilityEvent stateChanged(String pkg, String cls) {
@@ -304,26 +313,126 @@ public class TouchHelperServiceImplTest {
     }
 
     @Test
-    public void backPressure_dropsEventsWhoseSubTreeIsAlreadyQueued() throws Exception {
+    public void backPressure_collapsesEventsForTheSameSourceAndKeepsTheNewestSnapshot() throws Exception {
         startSkipAdProcess();
         CountDownLatch release = new CountDownLatch(1);
         executor.execute(() -> {
             try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
         });
 
-        // three events for the very same source view (e.g. an ad countdown label)
-        AtomicInteger skip = new AtomicInteger();
-        AccessibilityNodeInfo tree = keywordTree(new AtomicInteger(), skip);
-        for (int i = 0; i < 3; i++) {
-            impl.onAccessibilityEvent(contentChanged(AD_PKG, tree));
-        }
+        // the same label reports three times while the worker is busy; only the last
+        // snapshot carries the keyword (e.g. a countdown that turns into "跳过")
+        AtomicInteger clicks = new AtomicInteger();
+        AccessibilityNodeInfo label = node("android.widget.TextView", "3s", "com.example.ad:id/count", new Rect(800, 100, 1000, 180), clicks);
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, label));
+        AccessibilityNodeInfo again = AccessibilityNodeInfo.obtain(label);
+        again.setText("2s");
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, again));
+        AccessibilityNodeInfo latest = AccessibilityNodeInfo.obtain(label);
+        latest.setText("跳过");
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, latest));
+
         assertEquals("identical sub-trees must be queued once", 1, pendingTraversals());
         assertFalse("dedup is lossless and must not trigger a rescan", (Boolean) get(impl, "rescanNeeded"));
 
         release.countDown();
         awaitExecutor();
-        assertEquals(1, skip.get());
+        assertEquals("the queued scan must see the newest snapshot", 1, clicks.get());
         assertEquals(0, pendingTraversals());
+    }
+
+    @Test
+    public void backPressure_collapsesRepeatedFullWindowScansOfTheSameWindow() throws Exception {
+        startSkipAdProcess();
+        CountDownLatch release = new CountDownLatch(1);
+        executor.execute(() -> {
+            try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+        });
+        java.lang.reflect.Method m = TouchHelperServiceImpl.class.getDeclaredMethod("scheduleTraversal",
+                AccessibilityNodeInfo.class, Set.class, boolean.class, boolean.class);
+        m.setAccessible(true);
+        AtomicInteger clicks = new AtomicInteger();
+        AccessibilityNodeInfo window = keywordTree(new AtomicInteger(), clicks);
+        for (int i = 0; i < 5; i++) {
+            m.invoke(impl, AccessibilityNodeInfo.obtain(window), null, true, true);
+        }
+        assertEquals("one pending scan per window", 1, pendingTraversals());
+        release.countDown();
+        awaitExecutor();
+        assertEquals(1, clicks.get());
+    }
+
+    @Test
+    public void drain_yieldsTheWorkerBetweenTwoScans() throws Exception {
+        startSkipAdProcess();
+        CountDownLatch release = new CountDownLatch(1);
+        executor.execute(() -> {
+            try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+        });
+        for (int i = 0; i < 3; i++) {
+            impl.onAccessibilityEvent(contentChanged(AD_PKG, keywordTree(new AtomicInteger(), new AtomicInteger())));
+        }
+        assertEquals(3, pendingTraversals());
+        // a task submitted after the events (like a scheduled position click) must not have to
+        // wait for the whole backlog: the drain processes one sub-tree per executor task
+        AtomicInteger pendingWhenRun = new AtomicInteger(-1);
+        executor.execute(() -> pendingWhenRun.set(pendingTraversals()));
+
+        release.countDown();
+        awaitExecutor();
+        assertEquals(2, pendingWhenRun.get());
+        assertEquals(0, pendingTraversals());
+    }
+
+    @Test
+    public void widgetRule_keepsPriorityOverAnEarlierKeywordMatchInTheSameTree() throws Exception {
+        PackageWidgetDescription rule = new PackageWidgetDescription();
+        rule.packageName = AD_PKG;
+        rule.activityName = AD_ACTIVITY;
+        rule.idName = "com.example.ad:id/close";
+        Map<String, Set<PackageWidgetDescription>> rules = new HashMap<>();
+        rules.put(AD_PKG, new HashSet<>(Collections.singleton(rule)));
+        set(impl, "mapPackageWidgets", TouchHelperServiceImpl.snapshotWidgets(rules));
+        startSkipAdProcess();
+
+        // keyword node comes first in BFS order, the user-defined close button later
+        AtomicInteger keywordClicks = new AtomicInteger(), closeClicks = new AtomicInteger();
+        AccessibilityNodeInfo root = node("android.widget.FrameLayout", null, null, new Rect(0, 0, 1080, 1920), null);
+        AccessibilityNodeInfo skipText = node("android.widget.TextView", "跳过", "com.example.ad:id/skip_text", new Rect(0, 0, 200, 100), keywordClicks);
+        AccessibilityNodeInfo container = node("android.view.ViewGroup", null, null, new Rect(0, 100, 1080, 1920), null);
+        AccessibilityNodeInfo close = node("android.widget.ImageView", null, "com.example.ad:id/close", new Rect(900, 50, 1000, 150), closeClicks);
+        shadowOf(root).addChild(skipText);
+        shadowOf(root).addChild(container);
+        shadowOf(container).addChild(close);
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, root));
+        awaitExecutor();
+
+        assertEquals("the widget rule wins", 1, closeClicks.get());
+        assertEquals("the keyword node is not clicked when a widget rule matched", 0, keywordClicks.get());
+        assertNull(get(impl, "setTargetedWidgets"));
+
+        // with the widget rules satisfied, the keyword path takes over for later events
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, keywordTree(new AtomicInteger(), keywordClicks)));
+        awaitExecutor();
+        assertEquals(1, keywordClicks.get());
+    }
+
+    @Test
+    public void keywordMatch_isClickedWhenNoWidgetRuleMatchesTheTree() throws Exception {
+        PackageWidgetDescription rule = new PackageWidgetDescription();
+        rule.packageName = AD_PKG;
+        rule.idName = "com.example.ad:id/does_not_exist";
+        Map<String, Set<PackageWidgetDescription>> rules = new HashMap<>();
+        rules.put(AD_PKG, new HashSet<>(Collections.singleton(rule)));
+        set(impl, "mapPackageWidgets", TouchHelperServiceImpl.snapshotWidgets(rules));
+        startSkipAdProcess();
+
+        AtomicInteger other = new AtomicInteger(), skip = new AtomicInteger();
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, keywordTree(other, skip)));
+        awaitExecutor();
+        assertEquals(1, skip.get());
+        assertEquals(0, other.get());
+        assertNotNull("no widget matched, so widget matching stays active", get(impl, "setTargetedWidgets"));
     }
 
     @Test

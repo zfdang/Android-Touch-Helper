@@ -97,11 +97,12 @@ public class TouchHelperServiceImpl {
     private static final long RESCAN_MIN_INTERVAL_MS = 1000;
 
     private static final class PendingScan {
-        final AccessibilityNodeInfo root;
-        final Set<PackageWidgetDescription> widgets;
-        final boolean byKeyword;
+        /** latest snapshot of the sub-tree root; replaced when the same source view reports again */
+        AccessibilityNodeInfo root;
+        Set<PackageWidgetDescription> widgets;
+        boolean byKeyword;
         /** window-state scans are never evicted by later content-changed events */
-        final boolean sticky;
+        boolean sticky;
 
         PendingScan(AccessibilityNodeInfo root, Set<PackageWidgetDescription> widgets, boolean byKeyword, boolean sticky) {
             this.root = root;
@@ -461,13 +462,16 @@ public class TouchHelperServiceImpl {
      * a backlog of stale sub-trees and the newest content, where the skip button just appeared,
      * is scanned last. The pending scans are therefore kept in a small queue of our own:
      * <ol>
-     *   <li>an event whose source sub-tree is already queued is dropped: the queued scan reads
-     *       the live tree when it runs, so nothing is lost;</li>
+     *   <li>an event whose source sub-tree is already queued replaces the queued snapshot with
+     *       the newer one (an AccessibilityNodeInfo caches text/bounds at fetch time, children
+     *       are fetched live), so only one scan of that sub-tree runs and it sees the latest
+     *       state;</li>
      *   <li>when more than {@link #MAX_PENDING_TRAVERSALS} sub-trees are waiting, the oldest
-     *       (most stale) one is evicted in favour of the new event; once the queue drains a
-     *       single, rate-limited scan of the whole window makes up for whatever was evicted.</li>
+     *       (most stale) one is evicted in favour of the new event, and a single rate-limited
+     *       scan of the whole window is scheduled to make up for whatever was evicted.</li>
      * </ol>
-     * A full-window scan requested by a window-state change is never evicted.
+     * A full-window scan requested by a window-state change is never evicted; repeated requests
+     * for the same window collapse into one entry as well.
      *
      * @param mustRun true for window-state changes, whose full-window scan always runs
      */
@@ -481,32 +485,39 @@ public class TouchHelperServiceImpl {
         }
         final boolean startDrain;
         synchronized (scanLock) {
-            if (!mustRun) {
-                for (PendingScan queued : pendingScans) {
-                    // AccessibilityNodeInfo.equals() compares the source view id and window id
-                    if (root.equals(queued.root)) {
-                        if (BuildConfig.DEBUG) {
-                            Log.d(TAG, "traversal deduplicated, same sub-tree already queued");
-                        }
-                        recycleNode(root);
-                        return;
+            for (PendingScan queued : pendingScans) {
+                // AccessibilityNodeInfo.equals() compares the source view id and window id
+                if (root.equals(queued.root)) {
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "traversal deduplicated, same sub-tree already queued");
                     }
+                    // keep the newest snapshot of the node and the newest matching options
+                    recycleNode(queued.root);
+                    queued.root = root;
+                    queued.widgets = widgets;
+                    queued.byKeyword = byKeyword;
+                    queued.sticky |= mustRun;
+                    return;
                 }
-                if (pendingScans.size() >= MAX_PENDING_TRAVERSALS) {
-                    evictOldestContentScanLocked();
-                }
+            }
+            if (!mustRun && pendingScans.size() >= MAX_PENDING_TRAVERSALS) {
+                evictOldestContentScanLocked();
             }
             pendingScans.addLast(new PendingScan(root, widgets, byKeyword, mustRun));
             startDrain = !drainScheduled;
             drainScheduled = true;
         }
         if (startDrain) {
-            try {
-                executor.execute(this::drainPendingScans);
-            } catch (RuntimeException e) {
-                // executor shut down between the null check and execute()
-                clearPendingScans();
-            }
+            submitDrain(executor);
+        }
+    }
+
+    private void submitDrain(ScheduledExecutorService executor) {
+        try {
+            executor.execute(this::drainPendingScans);
+        } catch (RuntimeException e) {
+            // executor shut down between the null check and execute()
+            clearPendingScans();
         }
     }
 
@@ -520,43 +531,58 @@ public class TouchHelperServiceImpl {
                 it.remove();
                 recycleNode(scan.root);
                 rescanNeeded = true;
+                scheduleRescanIfNeededLocked();
                 return;
             }
         }
     }
 
-    /** Runs on the executor thread; scans queued sub-trees until the queue is empty. */
+    /**
+     * Runs on the executor thread. Scans one queued sub-tree, then re-submits itself while the
+     * queue is not empty, so that other executor tasks (the scheduled position clicks) get
+     * their turn between two scans instead of waiting for the whole backlog.
+     */
     private void drainPendingScans() {
-        while (true) {
-            PendingScan scan;
-            synchronized (scanLock) {
-                scan = pendingScans.pollFirst();
-                if (scan == null) {
-                    drainScheduled = false;
-                    scheduleRescanIfNeededLocked();
-                    return;
-                }
-            }
-            try {
-                iterateNodesToSkipAd(scan.root, scan.widgets, scan.byKeyword);
-            } catch (Throwable e) {
-                Log.e(TAG, Utilities.getTraceStackInString(e));
+        PendingScan scan;
+        synchronized (scanLock) {
+            scan = pendingScans.pollFirst();
+            if (scan == null) {
+                drainScheduled = false;
+                return;
             }
         }
+        try {
+            iterateNodesToSkipAd(scan.root, scan.widgets, scan.byKeyword);
+        } catch (Throwable e) {
+            Log.e(TAG, Utilities.getTraceStackInString(e));
+        }
+        final ScheduledExecutorService executor = taskExecutorService;
+        synchronized (scanLock) {
+            if (pendingScans.isEmpty() || executor == null) {
+                drainScheduled = false;
+                if (executor == null) clearPendingScansLocked();
+                return;
+            }
+        }
+        submitDrain(executor);
     }
 
     private void clearPendingScans() {
         synchronized (scanLock) {
-            PendingScan scan;
-            while ((scan = pendingScans.pollFirst()) != null) {
-                recycleNode(scan.root);
-            }
-            drainScheduled = false;
-            rescanNeeded = false;
+            clearPendingScansLocked();
         }
     }
 
-    /** Called with scanLock held once the queue is empty; posts one full-window rescan if scans were evicted. */
+    private void clearPendingScansLocked() {
+        PendingScan scan;
+        while ((scan = pendingScans.pollFirst()) != null) {
+            recycleNode(scan.root);
+        }
+        drainScheduled = false;
+        rescanNeeded = false;
+    }
+
+    /** Called with scanLock held after an eviction; posts one rate-limited full-window rescan. */
     private void scheduleRescanIfNeededLocked() {
         if (!rescanNeeded || rescanScheduled || !skipAdRunning) {
             return;
@@ -606,22 +632,32 @@ public class TouchHelperServiceImpl {
         final ArrayDeque<AccessibilityNodeInfo> queue = new ArrayDeque<>(64);
         queue.add(root);
         final Rect bounds = new Rect();
+        // While widget rules are active they keep priority over keywords, exactly like the
+        // former two-pass search: the first keyword hit is only remembered and clicked at the
+        // end if no widget rule matched anywhere in the tree.
+        AccessibilityNodeInfo keywordCandidate = null;
+        boolean handled = false;
         int visited = 0;
         try {
             while (skipAdRunning) {
                 AccessibilityNodeInfo node = queue.poll();
                 if (node == null) break;
                 visited++;
-                boolean handled = false;
-                if (widgets != null) {
-                    handled = skipAdByTargetedWidget(node, widgets, bounds);
-                }
-                if (!handled && keywords != null) {
-                    handled = skipAdByKeywords(node, keywords);
-                }
-                if (handled) {
+                if (widgets != null && skipAdByTargetedWidget(node, widgets, bounds)) {
+                    handled = true;
                     recycleNode(node);
                     break;
+                }
+                boolean isCandidate = false;
+                if (keywords != null && keywordCandidate == null && matchesKeyword(node, keywords)) {
+                    if (widgets == null) {
+                        clickKeywordNode(node);
+                        handled = true;
+                        recycleNode(node);
+                        break;
+                    }
+                    keywordCandidate = node;
+                    isCandidate = true;
                 }
                 final int childCount = node.getChildCount();
                 for (int n = 0; n < childCount; n++) {
@@ -630,9 +666,15 @@ public class TouchHelperServiceImpl {
                         queue.add(child);
                     }
                 }
-                recycleNode(node);
+                if (!isCandidate) {
+                    recycleNode(node);
+                }
+            }
+            if (!handled && keywordCandidate != null && skipAdRunning) {
+                clickKeywordNode(keywordCandidate);
             }
         } finally {
+            recycleNode(keywordCandidate);
             // ensure unprocessed nodes get recycled
             AccessibilityNodeInfo node;
             while ((node = queue.poll()) != null) {
@@ -655,9 +697,9 @@ public class TouchHelperServiceImpl {
     }
 
     /**
-     * 查找并点击包含keyword控件，目标包括Text和Description
+     * 判断节点的 Text / Description 是否包含关键字，且尚未在本轮跳过流程中被点击过
      */
-    private boolean skipAdByKeywords(AccessibilityNodeInfo node, List<String> keywords) {
+    private boolean matchesKeyword(AccessibilityNodeInfo node, List<String> keywords) {
         CharSequence description = node.getContentDescription();
         CharSequence text = node.getText();
         if ((description == null || description.length() == 0) && (text == null || text.length() == 0)) {
@@ -673,13 +715,20 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "identify keyword = " + keyword);
         }
+        return !clickedWidgets.contains(Utilities.describeAccessibilityNode(node));
+    }
+
+    /**
+     * 点击包含关键字的控件
+     */
+    private void clickKeywordNode(AccessibilityNodeInfo node) {
         String nodeDesc = Utilities.describeAccessibilityNode(node);
         if (BuildConfig.DEBUG) {
             Log.d(TAG, nodeDesc);
         }
         if (!clickedWidgets.add(nodeDesc)) {
             // already clicked this widget in this skip-ad process
-            return false;
+            return;
         }
         ShowToastInIntentService("正在根据关键字跳过广告...");
         boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
@@ -691,8 +740,6 @@ public class TouchHelperServiceImpl {
             node.getBoundsInScreen(rect);
             click(rect.centerX(), rect.centerY(), 0, 20);
         }
-        // is it possible that there are more nodes to click and this node does not work?
-        return true;
     }
 
     /**
