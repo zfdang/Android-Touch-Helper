@@ -15,7 +15,7 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.TextUtils;
+import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
@@ -33,13 +33,17 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -60,19 +64,53 @@ public class TouchHelperServiceImpl {
 
     public Handler receiverHandler;
 
-    private ScheduledExecutorService taskExecutorService;
+    private volatile ScheduledExecutorService taskExecutorService;
 
     private volatile boolean skipAdRunning, skipAdByActivityPosition, skipAdByActivityWidget, skipAdByKeyword;
     private PackageManager packageManager;
-    private String currentPackageName, currentActivityName;
+    // written on the main thread, read on the executor thread
+    private volatile String currentPackageName, currentActivityName;
     private String packageName;
-    private Set<String> setPackages, setIMEApps, setWhiteList;
-    private Set<String> clickedWidgets;
-    private List<String> keyWordList;
+    private volatile Set<String> setPackages = Collections.emptySet();
+    private volatile Set<String> setIMEApps = Collections.emptySet();
+    private volatile Set<String> setWhiteList = Collections.emptySet();
+    // widgets clicked during the current skip-ad process; cleared on the main thread, used on the executor
+    private final Set<String> clickedWidgets = ConcurrentHashMap.newKeySet();
+    private volatile List<String> keyWordList = Collections.emptyList();
 
-    private Map<String, PackagePositionDescription> mapPackagePositions;
-    private Map<String, Set<PackageWidgetDescription>> mapPackageWidgets;
+    // immutable snapshots of the user rules, replaced wholesale when settings change
+    private volatile Map<String, PackagePositionDescription> mapPackagePositions = Collections.emptyMap();
+    private volatile Map<String, Set<PackageWidgetDescription>> mapPackageWidgets = Collections.emptyMap();
     private volatile Set<PackageWidgetDescription> setTargetedWidgets;
+
+    // back-pressure for node-tree traversals, see scheduleTraversal()
+    private static final int MAX_PENDING_TRAVERSALS = 3;
+    private final Object scanLock = new Object();
+    // guarded by scanLock: sub-trees waiting to be scanned, oldest first
+    private final ArrayDeque<PendingScan> pendingScans = new ArrayDeque<>(MAX_PENDING_TRAVERSALS + 1);
+    // guarded by scanLock: whether drainPendingScans() is queued or running on the executor
+    private boolean drainScheduled;
+    // guarded by scanLock: a content scan was evicted, so the whole window must be rescanned once
+    // the queue drains; rescans are rate limited so a long burst costs at most one per interval
+    private boolean rescanNeeded, rescanScheduled;
+    private long lastRescanUptime;
+    private static final long RESCAN_MIN_INTERVAL_MS = 1000;
+
+    private static final class PendingScan {
+        /** latest snapshot of the sub-tree root; replaced when the same source view reports again */
+        AccessibilityNodeInfo root;
+        Set<PackageWidgetDescription> widgets;
+        boolean byKeyword;
+        /** window-state scans are never evicted by later content-changed events */
+        boolean sticky;
+
+        PendingScan(AccessibilityNodeInfo root, Set<PackageWidgetDescription> widgets, boolean byKeyword, boolean sticky) {
+            this.root = root;
+            this.widgets = widgets;
+            this.byKeyword = byKeyword;
+            this.sticky = sticky;
+        }
+    }
 
     // try to click 5 times, first click after 300ms, and delayed for 500ms for future clicks
     private static final int PACKAGE_POSITION_CLICK_FIRST_DELAY = 300;
@@ -132,21 +170,21 @@ public class TouchHelperServiceImpl {
             setWhiteList = mSetting.getWhitelistPackages();
 
             // load pre-defined widgets or positions
-            mapPackageWidgets = mSetting.getPackageWidgets();
-            mapPackagePositions = mSetting.getPackagePositions();
+            refreshCustomizedRules();
 
             // collect all installed packages
             packageManager = service.getPackageManager();
             updatePackage();
 
-            // init clickedWidgets
-            clickedWidgets = new HashSet<>();
+            clickedWidgets.clear();
 
             // install receiver and handler for broadcasting events
             InstallReceiverAndHandler();
 
             // create future task
-            taskExecutorService = Executors.newSingleThreadScheduledExecutor();
+            if (taskExecutorService == null || taskExecutorService.isShutdown()) {
+                taskExecutorService = Executors.newSingleThreadScheduledExecutor();
+            }
         } catch (Throwable e) {
             Log.e(TAG, Utilities.getTraceStackInString(e));
         }
@@ -154,6 +192,31 @@ public class TouchHelperServiceImpl {
 
     public void onInterrupt(){
         // stopSkipAdProcess();
+    }
+
+    /**
+     * Take immutable snapshots of the widget / position rules. The executor thread iterates
+     * these while the UI may be editing the live maps held by {@link Settings}, so the service
+     * never shares a mutable collection with the settings screens.
+     */
+    private void refreshCustomizedRules() {
+        mapPackageWidgets = snapshotWidgets(mSetting.getPackageWidgets());
+        Map<String, PackagePositionDescription> positions = mSetting.getPackagePositions();
+        mapPackagePositions = positions == null ? Collections.emptyMap()
+                : Collections.unmodifiableMap(new HashMap<>(positions));
+    }
+
+    static Map<String, Set<PackageWidgetDescription>> snapshotWidgets(Map<String, Set<PackageWidgetDescription>> source) {
+        if (source == null || source.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        HashMap<String, Set<PackageWidgetDescription>> copy = new HashMap<>(source.size() * 2);
+        for (Map.Entry<String, Set<PackageWidgetDescription>> entry : source.entrySet()) {
+            Set<PackageWidgetDescription> widgets = entry.getValue();
+            if (entry.getKey() == null || widgets == null || widgets.isEmpty()) continue;
+            copy.put(entry.getKey(), Collections.unmodifiableSet(new HashSet<>(widgets)));
+        }
+        return Collections.unmodifiableMap(copy);
     }
 
     private void InstallReceiverAndHandler() {
@@ -183,8 +246,7 @@ public class TouchHelperServiceImpl {
                     updatePackage();
                     break;
                 case TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY:
-                    mapPackageWidgets = mSetting.getPackageWidgets();
-                    mapPackagePositions = mSetting.getPackagePositions();
+                    refreshCustomizedRules();
                     if (BuildConfig.DEBUG) {
                         Log.d(TAG, mapPackageWidgets.keySet().toString());
                         Log.d(TAG, mapPackagePositions.keySet().toString());
@@ -252,11 +314,17 @@ public class TouchHelperServiceImpl {
             Log.d(TAG, AccessibilityEvent.eventTypeToString(event.getEventType()) + " - " + event.getPackageName() + " - " + event.getClassName() + "; ");
             Log.d(TAG, "    currentPackageName = " + currentPackageName + "  currentActivityName = " + currentActivityName);
         }
+        final int eventType = event.getEventType();
+        // Fast path: content changes are by far the most frequent event and only matter while a
+        // skip-ad process is active. Bail out before touching any CharSequence or collection.
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && !skipAdRunning) {
+            return;
+        }
         CharSequence tempPkgName = event.getPackageName();
         CharSequence tempClassName = event.getClassName();
         if (tempPkgName == null || tempClassName == null) return;
         try {
-            switch (event.getEventType()) {
+            switch (eventType) {
                 case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
                     String pkgName = tempPkgName.toString();
                     if(setIMEApps.contains(pkgName)) {
@@ -294,6 +362,11 @@ public class TouchHelperServiceImpl {
                         }
                     }
 
+                    if (!skipAdRunning) {
+                        // nothing to do for this package (whitelisted / launcher / IME ...)
+                        break;
+                    }
+
                     // now to take different methods to skip ads
 
                     // first method is to skip ads by position in activity
@@ -301,7 +374,7 @@ public class TouchHelperServiceImpl {
                         // run this method for once only
                         skipAdByActivityPosition = false;
 
-                        PackagePositionDescription packagePositionDescription = mapPackagePositions.get(currentPackageName);
+                        final PackagePositionDescription packagePositionDescription = mapPackagePositions.get(currentPackageName);
                         if (packagePositionDescription != null) {
                             ShowToastInIntentService("正在根据位置跳过广告...");
 
@@ -311,7 +384,7 @@ public class TouchHelperServiceImpl {
                                 int num = 0;
                                 @Override
                                 public void run() {
-                                    if (num < PACKAGE_POSITION_CLICK_RETRY) {
+                                    if (num < PACKAGE_POSITION_CLICK_RETRY && skipAdRunning) {
                                         if(currentActivityName.equals(packagePositionDescription.activityName)) {
                                             // current activity is null, or current activity is the target activity
                                             if (BuildConfig.DEBUG) {
@@ -337,45 +410,25 @@ public class TouchHelperServiceImpl {
                         skipAdByActivityWidget = false;
                         setTargetedWidgets = mapPackageWidgets.get(currentPackageName);
                     }
-                    if(setTargetedWidgets != null) {
-                        if (BuildConfig.DEBUG) {
-                            Log.d(TAG, "Find skip-ad by widget, simulate click ");
-                        }
-                        // this code could be run multiple times
-                        final AccessibilityNodeInfo node = service.getRootInActiveWindow();
-                        final Set<PackageWidgetDescription> widgets = setTargetedWidgets;
-                        taskExecutorService.execute(() -> iterateNodesToSkipAd(node, widgets));
-                    }
 
-                    if (skipAdByKeyword) {
+                    // third: skip ads by keywords. Both widget and keyword matching share one
+                    // traversal of the window; a window state change always gets a full scan.
+                    if (setTargetedWidgets != null || skipAdByKeyword) {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "method by keywords in STATE_CHANGED");
                         }
-                        // this code could be run multiple times
-                        final AccessibilityNodeInfo node = service.getRootInActiveWindow();
-                        taskExecutorService.execute(() -> iterateNodesToSkipAd(node, null));
+                        scheduleTraversal(rootOfActiveTargetWindow(), setTargetedWidgets, skipAdByKeyword, true);
                     }
                     break;
                 case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:
                     if(!setPackages.contains(tempPkgName.toString())) {
                         break;
                     }
-
-                    if (setTargetedWidgets != null) {
-                        if (BuildConfig.DEBUG) {
-                            Log.d(TAG, "method by widget in CONTENT_CHANGED");
-                        }
-                        final AccessibilityNodeInfo node = event.getSource();
-                        final Set<PackageWidgetDescription> widgets = setTargetedWidgets;
-                        taskExecutorService.execute(() -> iterateNodesToSkipAd(node, widgets));
-                    }
-
-                    if (skipAdByKeyword) {
+                    if (setTargetedWidgets != null || skipAdByKeyword) {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "method by keywords in CONTENT_CHANGED");
                         }
-                        final AccessibilityNodeInfo node = event.getSource();
-                        taskExecutorService.execute(() -> iterateNodesToSkipAd(node, null));
+                        scheduleTraversal(event.getSource(), setTargetedWidgets, skipAdByKeyword, false);
                     }
                     break;
             }
@@ -386,6 +439,14 @@ public class TouchHelperServiceImpl {
 
     public void onUnbind(Intent intent) {
         try {
+            stopSkipAdProcessInner();
+            if (receiverHandler != null) {
+                receiverHandler.removeCallbacksAndMessages(null);
+            }
+            if (taskExecutorService != null) {
+                taskExecutorService.shutdownNow();
+                taskExecutorService = null;
+            }
             service.unregisterReceiver(userPresentReceiver);
             service.unregisterReceiver(packageChangeReceiver);
         } catch (Throwable e) {
@@ -394,161 +455,355 @@ public class TouchHelperServiceImpl {
     }
 
     /**
-     * 遍历节点跳过广告
-     * @param root 根节点
-     * @param set 传入set时按控件判断，否则按关键词判断
+     * Queue one traversal of the sub-tree rooted at {@code root}.
+     *
+     * <p>Ad screens emit window-content-changed events at tens of events per second, while a
+     * traversal costs Binder round-trips per node. Without back-pressure the worker accumulates
+     * a backlog of stale sub-trees and the newest content, where the skip button just appeared,
+     * is scanned last. The pending scans are therefore kept in a small queue of our own:
+     * <ol>
+     *   <li>an event whose source sub-tree is already queued replaces the queued snapshot with
+     *       the newer one (an AccessibilityNodeInfo caches text/bounds at fetch time, children
+     *       are fetched live), so only one scan of that sub-tree runs and it sees the latest
+     *       state;</li>
+     *   <li>when more than {@link #MAX_PENDING_TRAVERSALS} sub-trees are waiting, the oldest
+     *       (most stale) one is evicted in favour of the new event, and a single rate-limited
+     *       scan of the whole window is scheduled to make up for whatever was evicted.</li>
+     * </ol>
+     * A full-window scan requested by a window-state change is never evicted; repeated requests
+     * for the same window collapse into one entry as well.
+     *
+     * @param mustRun true for window-state changes, whose full-window scan always runs
      */
-    private void iterateNodesToSkipAd(AccessibilityNodeInfo root, Set<PackageWidgetDescription> set) {
-        ArrayList<AccessibilityNodeInfo> topNodes = new ArrayList<>();
-        topNodes.add(root);
-        ArrayList<AccessibilityNodeInfo> childNodes = new ArrayList<>();
+    private void scheduleTraversal(final AccessibilityNodeInfo root, final Set<PackageWidgetDescription> widgets,
+                                   final boolean byKeyword, boolean mustRun) {
+        if (root == null) return;
+        final ScheduledExecutorService executor = taskExecutorService;
+        if (executor == null || (!byKeyword && widgets == null)) {
+            recycleNode(root);
+            return;
+        }
+        final boolean startDrain;
+        synchronized (scanLock) {
+            for (PendingScan queued : pendingScans) {
+                // AccessibilityNodeInfo.equals() compares the source view id and window id
+                if (root.equals(queued.root)) {
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "traversal deduplicated, same sub-tree already queued");
+                    }
+                    // keep the newest snapshot of the node and the newest matching options
+                    recycleNode(queued.root);
+                    queued.root = root;
+                    queued.widgets = widgets;
+                    queued.byKeyword = byKeyword;
+                    queued.sticky |= mustRun;
+                    return;
+                }
+            }
+            if (!mustRun && pendingScans.size() >= MAX_PENDING_TRAVERSALS) {
+                evictOldestContentScanLocked();
+            }
+            pendingScans.addLast(new PendingScan(root, widgets, byKeyword, mustRun));
+            startDrain = !drainScheduled;
+            drainScheduled = true;
+        }
+        if (startDrain) {
+            submitDrain(executor);
+        }
+    }
 
-        int total = topNodes.size();
-        int index = 0;
-        AccessibilityNodeInfo node;
-        boolean handled;
-        while (index < total && skipAdRunning) {
-            node = topNodes.get(index++);
-            if (node != null) {
-                if (set != null) {
-                    handled = skipAdByTargetedWidget(node, set);
-                } else {
-                    handled = skipAdByKeywords(node);
-                }
-                if (handled) {
-                    node.recycle();
-                    break;
-                }
-                for (int n = 0; n < node.getChildCount(); n++) {
-                    childNodes.add(node.getChild(n));
-                }
-                node.recycle();
-            }
-            if (index == total) {
-                // topNodes ends, now iterate child nodes
-                topNodes.clear();
-                topNodes.addAll(childNodes);
-                childNodes.clear();
-                index = 0;
-                total = topNodes.size();
-            }
+    private void submitDrain(ScheduledExecutorService executor) {
+        try {
+            executor.execute(this::drainPendingScans);
+        } catch (RuntimeException e) {
+            // executor shut down between the null check and execute()
+            clearPendingScans();
         }
-        // ensure unprocessed nodes get recycled
-        while (index < total) {
-            node = topNodes.get(index++);
-            if (node != null) node.recycle();
-        }
-        index = 0;
-        total = childNodes.size();
-        while (index < total) {
-            node = childNodes.get(index++);
-            if (node != null) node.recycle();
+    }
+
+    private void evictOldestContentScanLocked() {
+        for (Iterator<PendingScan> it = pendingScans.iterator(); it.hasNext(); ) {
+            PendingScan scan = it.next();
+            if (!scan.sticky) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "traversal coalesced, stale sub-tree evicted");
+                }
+                it.remove();
+                recycleNode(scan.root);
+                rescanNeeded = true;
+                scheduleRescanIfNeededLocked();
+                return;
+            }
         }
     }
 
     /**
-     * 查找并点击包含keyword控件，目标包括Text和Description
+     * Runs on the executor thread. Scans one queued sub-tree, then re-submits itself while the
+     * queue is not empty, so that other executor tasks (the scheduled position clicks) get
+     * their turn between two scans instead of waiting for the whole backlog.
      */
-    private boolean skipAdByKeywords(AccessibilityNodeInfo node) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "skipAdByKeywords triggered: " + Utilities.describeAccessibilityNode(node));
+    private void drainPendingScans() {
+        PendingScan scan;
+        synchronized (scanLock) {
+            scan = pendingScans.pollFirst();
+            if (scan == null) {
+                drainScheduled = false;
+                return;
+            }
         }
+        try {
+            iterateNodesToSkipAd(scan.root, scan.widgets, scan.byKeyword);
+        } catch (Throwable e) {
+            Log.e(TAG, Utilities.getTraceStackInString(e));
+        }
+        final ScheduledExecutorService executor = taskExecutorService;
+        synchronized (scanLock) {
+            if (pendingScans.isEmpty() || executor == null) {
+                drainScheduled = false;
+                if (executor == null) clearPendingScansLocked();
+                return;
+            }
+        }
+        submitDrain(executor);
+    }
+
+    private void clearPendingScans() {
+        synchronized (scanLock) {
+            clearPendingScansLocked();
+        }
+    }
+
+    private void clearPendingScansLocked() {
+        PendingScan scan;
+        while ((scan = pendingScans.pollFirst()) != null) {
+            recycleNode(scan.root);
+        }
+        drainScheduled = false;
+        rescanNeeded = false;
+    }
+
+    /** Called with scanLock held after an eviction; posts one rate-limited full-window rescan. */
+    private void scheduleRescanIfNeededLocked() {
+        if (!rescanNeeded || rescanScheduled || !skipAdRunning) {
+            return;
+        }
+        final Handler handler = receiverHandler;
+        if (handler == null) {
+            return;
+        }
+        rescanNeeded = false;
+        rescanScheduled = true;
+        long now = SystemClock.uptimeMillis();
+        long at = Math.max(now, lastRescanUptime + RESCAN_MIN_INTERVAL_MS);
+        lastRescanUptime = at;
+        handler.postAtTime(this::rescanActiveWindow, at);
+    }
+
+    /** Runs on the main thread: scans the whole active window to cover evicted sub-trees. */
+    private void rescanActiveWindow() {
+        synchronized (scanLock) {
+            rescanScheduled = false;
+        }
+        if (!skipAdRunning) return;
+        Set<PackageWidgetDescription> widgets = setTargetedWidgets;
+        if (widgets == null && !skipAdByKeyword) return;
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "rescan active window after evicted sub-trees");
+        }
+        scheduleTraversal(rootOfActiveTargetWindow(), widgets, skipAdByKeyword, true);
+    }
+
+    /**
+     * Root of the active window, or null when that window does not belong to one of the
+     * packages we handle. Full-window scans are requested asynchronously, so by the time we
+     * look the active window may be an IME, the launcher or a whitelisted app; those windows
+     * are excluded from event handling and must never be scanned or clicked either.
+     */
+    private AccessibilityNodeInfo rootOfActiveTargetWindow() {
+        AccessibilityNodeInfo root = service.getRootInActiveWindow();
+        if (root == null) return null;
+        CharSequence pkg = root.getPackageName();
+        if (pkg == null || !setPackages.contains(pkg.toString())) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "active window belongs to " + pkg + ", not scanning it");
+            }
+            recycleNode(root);
+            return null;
+        }
+        return root;
+    }
+
+    /** number of sub-trees waiting to be scanned; exposed for tests */
+    int pendingScanCount() {
+        synchronized (scanLock) {
+            return pendingScans.size();
+        }
+    }
+
+    /**
+     * 遍历节点跳过广告（广度优先）
+     * @param root      根节点
+     * @param widgets   非空时按控件规则匹配
+     * @param byKeyword 为 true 时按关键词匹配；两种方式共用同一次遍历
+     */
+    void iterateNodesToSkipAd(AccessibilityNodeInfo root, Set<PackageWidgetDescription> widgets, boolean byKeyword) {
+        if (root == null) return;
+        final List<String> keywords = byKeyword ? keyWordList : null;
+        final ArrayDeque<AccessibilityNodeInfo> queue = new ArrayDeque<>(64);
+        queue.add(root);
+        final Rect bounds = new Rect();
+        // While widget rules are active they keep priority over keywords, exactly like the
+        // former two-pass search: the first keyword hit is only remembered and clicked at the
+        // end if no widget rule matched anywhere in the tree.
+        AccessibilityNodeInfo keywordCandidate = null;
+        boolean handled = false;
+        int visited = 0;
+        try {
+            while (skipAdRunning) {
+                AccessibilityNodeInfo node = queue.poll();
+                if (node == null) break;
+                visited++;
+                if (widgets != null && skipAdByTargetedWidget(node, widgets, bounds)) {
+                    handled = true;
+                    recycleNode(node);
+                    break;
+                }
+                boolean isCandidate = false;
+                if (keywords != null && keywordCandidate == null && matchesKeyword(node, keywords)) {
+                    if (widgets == null) {
+                        clickKeywordNode(node);
+                        handled = true;
+                        recycleNode(node);
+                        break;
+                    }
+                    keywordCandidate = node;
+                    isCandidate = true;
+                }
+                final int childCount = node.getChildCount();
+                for (int n = 0; n < childCount; n++) {
+                    AccessibilityNodeInfo child = node.getChild(n);
+                    if (child != null) {
+                        queue.add(child);
+                    }
+                }
+                if (!isCandidate) {
+                    recycleNode(node);
+                }
+            }
+            if (!handled && keywordCandidate != null && skipAdRunning) {
+                clickKeywordNode(keywordCandidate);
+            }
+        } finally {
+            recycleNode(keywordCandidate);
+            // ensure unprocessed nodes get recycled
+            AccessibilityNodeInfo node;
+            while ((node = queue.poll()) != null) {
+                recycleNode(node);
+            }
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "traversal visited " + visited + " nodes");
+            }
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void recycleNode(AccessibilityNodeInfo node) {
+        if (node == null) return;
+        try {
+            node.recycle();
+        } catch (IllegalStateException ignored) {
+            // already recycled
+        }
+    }
+
+    /**
+     * 判断节点的 Text / Description 是否包含关键字，且尚未在本轮跳过流程中被点击过
+     */
+    private boolean matchesKeyword(AccessibilityNodeInfo node, List<String> keywords) {
         CharSequence description = node.getContentDescription();
         CharSequence text = node.getText();
-        if (TextUtils.isEmpty(description) && TextUtils.isEmpty(text)) {
+        if ((description == null || description.length() == 0) && (text == null || text.length() == 0)) {
             return false;
         }
-        // try to find keyword
-        boolean isFound = false;
-        for (String keyword: keyWordList) {
-            // text or description contains keyword, but not too long （<= length + 6）
-            if (text != null && (text.toString().length() <= keyword.length() + 6 ) && text.toString().contains(keyword) && !text.toString().equals(SelfPackageName)) {
-                isFound = true;
-            } else if (description != null && (description.toString().length() <= keyword.length() + 6) && description.toString().contains(keyword)  && !description.toString().equals(SelfPackageName)) {
-                isFound = true;
-            }
-            if (isFound) {
-                // if this node matches our target, stop finding more keywords
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "identify keyword = " + keyword);
-                }
-                break;
-            }
+        String keyword = SkipAdRules.findKeyword(
+                text == null ? null : text.toString(),
+                description == null ? null : description.toString(),
+                keywords, SelfPackageName);
+        if (keyword == null) {
+            return false;
         }
-        // if this node matches our target, try to click it
-        if (isFound) {
-            String nodeDesc = Utilities.describeAccessibilityNode(node);
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, nodeDesc);
-            }
-            if (!clickedWidgets.contains(nodeDesc)) {
-                clickedWidgets.add(nodeDesc);
-
-                ShowToastInIntentService("正在根据关键字跳过广告...");
-                boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "self clicked = " + clicked);
-                }
-                if (!clicked) {
-                    Rect rect = new Rect();
-                    node.getBoundsInScreen(rect);
-                    click(rect.centerX(), rect.centerY(), 0, 20);
-                }
-
-                // is it possible that there are more nodes to click and this node does not work?
-                return true;
-            }
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "identify keyword = " + keyword);
         }
-        return false;
+        return !clickedWidgets.contains(Utilities.describeAccessibilityNode(node));
+    }
+
+    /**
+     * 点击包含关键字的控件
+     */
+    private void clickKeywordNode(AccessibilityNodeInfo node) {
+        String nodeDesc = Utilities.describeAccessibilityNode(node);
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, nodeDesc);
+        }
+        if (!clickedWidgets.add(nodeDesc)) {
+            // already clicked this widget in this skip-ad process
+            return;
+        }
+        ShowToastInIntentService("正在根据关键字跳过广告...");
+        boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "self clicked = " + clicked);
+        }
+        if (!clicked) {
+            Rect rect = new Rect();
+            node.getBoundsInScreen(rect);
+            click(rect.centerX(), rect.centerY(), 0, 20);
+        }
     }
 
     /**
      * 查找并点击由 ActivityWidgetDescription 定义的控件
      */
-    private boolean skipAdByTargetedWidget(AccessibilityNodeInfo node, Set<PackageWidgetDescription> set) {
-        Rect temRect = new Rect();
-        node.getBoundsInScreen(temRect);
+    private boolean skipAdByTargetedWidget(AccessibilityNodeInfo node, Set<PackageWidgetDescription> set, Rect bounds) {
+        node.getBoundsInScreen(bounds);
         CharSequence cId = node.getViewIdResourceName();
         CharSequence cDescribe = node.getContentDescription();
         CharSequence cText = node.getText();
-        for (PackageWidgetDescription e : set) {
-            boolean isFound = false;
-            if (temRect.equals(e.position)) {
-                isFound = true;
-            } else if (cId != null && !e.idName.isEmpty() && cId.toString().equals(e.idName)) {
-                isFound = true;
-            } else if (cDescribe != null && !e.description.isEmpty() && cDescribe.toString().contains(e.description)) {
-                isFound = true;
-            } else if (cText != null && !e.text.isEmpty() && cText.toString().contains(e.text)) {
-                isFound = true;
+        PackageWidgetDescription e = SkipAdRules.findWidget(
+                bounds.left, bounds.top, bounds.right, bounds.bottom,
+                cId == null ? null : cId.toString(),
+                cDescribe == null ? null : cDescribe.toString(),
+                cText == null ? null : cText.toString(),
+                set);
+        if (e == null) {
+            return false;
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "Find skip-ad by Widget " + e.toString());
+        }
+        String nodeDesc = Utilities.describeAccessibilityNode(node);
+        if (!clickedWidgets.add(nodeDesc)) {
+            // avoid multiple click on the same widget
+            return false;
+        }
+        ShowToastInIntentService("正在根据控件跳过广告...");
+        if (e.onlyClick) {
+            click(bounds.centerX(), bounds.centerY(), 0, 20);
+        } else if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            AccessibilityNodeInfo parent = node.getParent();
+            boolean parentClicked = false;
+            if (parent != null) {
+                parentClicked = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                recycleNode(parent);
             }
-
-            if (isFound) {
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "Find skip-ad by Widget " + e.toString());
-                }
-                String nodeDesc = Utilities.describeAccessibilityNode(node);
-                if(!clickedWidgets.contains(nodeDesc)) {
-                    // add this widget to clicked widget, avoid multiple click on the same widget
-                    clickedWidgets.add(nodeDesc);
-
-                    ShowToastInIntentService("正在根据控件跳过广告...");
-                    if (e.onlyClick) {
-                        click(temRect.centerX(), temRect.centerY(), 0, 20);
-                    } else {
-                        if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                            if (!node.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                                click(temRect.centerX(), temRect.centerY(), 0, 20);
-                            }
-                        }
-                    }
-                    // clear setWidgets, stop trying
-                    if (setTargetedWidgets == set) setTargetedWidgets = null;
-                    return true;
-                }
+            if (!parentClicked) {
+                click(bounds.centerX(), bounds.centerY(), 0, 20);
             }
         }
-        return false;
+        // clear setWidgets, stop trying
+        if (setTargetedWidgets == set) setTargetedWidgets = null;
+        return true;
     }
 
     private void showAllChildren(AccessibilityNodeInfo root){
@@ -619,6 +874,7 @@ public class TouchHelperServiceImpl {
         skipAdByActivityWidget = true;
         skipAdByKeyword = true;
         setTargetedWidgets = null;
+        clearPendingScans();
         clickedWidgets.clear();
 
         // cancel all methods N seconds later
@@ -646,6 +902,7 @@ public class TouchHelperServiceImpl {
         skipAdByActivityWidget = false;
         skipAdByKeyword = false;
         setTargetedWidgets = null;
+        clearPendingScans();
     }
 
     /**
@@ -655,8 +912,8 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "updatePackage");
         }
-        setPackages = new HashSet<>();
-        setIMEApps = new HashSet<>();
+        Set<String> setPackages = new HashSet<>();
+        Set<String> setIMEApps = new HashSet<>();
         Set<String> setTemps = new HashSet<>();
 
         // find all launchers
@@ -689,6 +946,9 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Working List = " + setPackages.toString());
         }
+        // publish the new sets atomically for the event thread
+        this.setIMEApps = setIMEApps;
+        this.setPackages = setPackages;
     }
 
     // display activity customization dialog, and allow users to pick widget or positions
@@ -925,28 +1185,30 @@ public class TouchHelperServiceImpl {
             @Override
             public void onClick(View v) {
                 PackageWidgetDescription temWidget = new PackageWidgetDescription(widgetDescription);
-                Set<PackageWidgetDescription> set = mapPackageWidgets.get(widgetDescription.packageName);
+                Map<String, Set<PackageWidgetDescription>> saved = Settings.getInstance().getPackageWidgets();
+                Set<PackageWidgetDescription> set = saved.get(widgetDescription.packageName);
                 if (set == null) {
                     set = new HashSet<>();
-                    set.add(temWidget);
-                    mapPackageWidgets.put(widgetDescription.packageName, set);
-                } else {
-                    set.add(temWidget);
+                    saved.put(widgetDescription.packageName, set);
                 }
+                set.add(temWidget);
                 btAddWidget.setEnabled(false);
                 tvPackageName.setText(widgetDescription.packageName + " (以下控件数据已保存)");
-                // save
-                Settings.getInstance().setPackageWidgets(mapPackageWidgets);
+                // save, then refresh our immutable snapshot
+                Settings.getInstance().setPackageWidgets(saved);
+                refreshCustomizedRules();
             }
         });
         btAddPosition.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mapPackagePositions.put(positionDescription.packageName, new PackagePositionDescription(positionDescription));
+                Map<String, PackagePositionDescription> saved = Settings.getInstance().getPackagePositions();
+                saved.put(positionDescription.packageName, new PackagePositionDescription(positionDescription));
                 btAddPosition.setEnabled(false);
                 tvPackageName.setText(positionDescription.packageName + " (以下坐标数据已保存)");
-                // save
-                Settings.getInstance().setPackagePositions(mapPackagePositions);
+                // save, then refresh our immutable snapshot
+                Settings.getInstance().setPackagePositions(saved);
+                refreshCustomizedRules();
             }
         });
         btDumpScreen.setOnClickListener(new View.OnClickListener() {

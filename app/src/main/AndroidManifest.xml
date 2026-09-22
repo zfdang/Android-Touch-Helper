@@ -15,7 +15,6 @@
 
     <application
         android:name="com.zfdang.TouchHelperApp"
-        android:largeHeap="true"
         android:allowBackup="true"
         android:icon="@drawable/ic_touch_helper_icon"
         android:label="@string/app_name"
@@ -45,19 +44,6 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
-
-        <receiver
-            android:name=".TouchHelperServiceReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="90000">
-                <action android:name="android.intent.action.PACKAGE_ADDED" />
-                <action android:name="android.intent.action.PACKAGE_REMOVED" />
-                <action android:name="android.intent.action.USER_PRESENT" />
-<!--                <action android:name="android.intent.action.SCREEN_ON" />-->
-                <data android:scheme="package" />
-            </intent-filter>
-        </receiver>
     </application>
 
 

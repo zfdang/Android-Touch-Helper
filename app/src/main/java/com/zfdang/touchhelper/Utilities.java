@@ -41,31 +41,30 @@ public class Utilities {
             return "null";
         }
 
-        String result = "Node";
-
-        result += " class =" + e.getClassName().toString();
+        StringBuilder result = new StringBuilder(128);
+        result.append("Node class =").append(e.getClassName());
 
         final Rect rect = new Rect();
         e.getBoundsInScreen(rect);
-        result += String.format(" Position=[%d, %d, %d, %d]", rect.left, rect.right, rect.top, rect.bottom);
-
+        result.append(" Position=[").append(rect.left).append(", ").append(rect.right)
+                .append(", ").append(rect.top).append(", ").append(rect.bottom).append(']');
 
         CharSequence id = e.getViewIdResourceName();
         if(id != null) {
-            result += " ResourceId=" + id.toString();
+            result.append(" ResourceId=").append(id);
         }
 
         CharSequence description = e.getContentDescription();
         if(description != null) {
-            result += " Description=" + description.toString();
+            result.append(" Description=").append(description);
         }
 
         CharSequence text = e.getText();
         if(text != null) {
-            result += " Text=" + text.toString();
+            result.append(" Text=").append(text);
         }
 
-        return result;
+        return result.toString();
     }
 
 }
