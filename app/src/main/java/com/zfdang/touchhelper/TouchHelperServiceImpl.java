@@ -3,6 +3,7 @@ package com.zfdang.touchhelper;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.annotation.SuppressLint;
+import android.app.KeyguardManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -15,6 +16,7 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -68,14 +70,50 @@ public class TouchHelperServiceImpl {
 
     private volatile boolean skipAdRunning, skipAdByActivityPosition, skipAdByActivityWidget, skipAdByKeyword;
     private PackageManager packageManager;
+    private KeyguardManager keyguardManager;
+    private PowerManager powerManager;
+    // set when the lock screen (or a dark screen) covered the current target app; the next window
+    // of that app is then a warm start that may show a splash ad. Broadcasts such as USER_PRESENT
+    // are not delivered to third-party apps on every device (OPPO: "oplus skip sp"), so this is
+    // detected from the accessibility events themselves.
+    private volatile boolean wakeupPending;
     // written on the main thread, read on the executor thread
     private volatile String currentPackageName, currentActivityName;
     private String packageName;
     private volatile Set<String> setPackages = Collections.emptySet();
     private volatile Set<String> setIMEApps = Collections.emptySet();
     private volatile Set<String> setWhiteList = Collections.emptySet();
-    // widgets clicked during the current skip-ad process; cleared on the main thread, used on the executor
-    private final Set<String> clickedWidgets = ConcurrentHashMap.newKeySet();
+    // per-process click state. startSkipAdProcess() installs a fresh session; traversals capture
+    // the session they started under and only ever write to that one, so a click that completes
+    // after the user re-entered the app cannot leak into the new process. See clickNode().
+    private volatile ClickSession session = new ClickSession();
+
+    private static final class ClickSession {
+        /** widgets clicked in this process, keyed by clickKey() */
+        final Map<String, ClickAttempt> clickedWidgets = new ConcurrentHashMap<>();
+        /** set once a widget rule got its final attempt; widget matching then stops for this process */
+        volatile boolean widgetRulesDone;
+    }
+
+    /** the widget rules still in force for the current process, or null */
+    private Set<PackageWidgetDescription> activeWidgetRules() {
+        return session.widgetRulesDone ? null : setTargetedWidgets;
+    }
+
+    /**
+     * A widget is clicked at most {@link #MAX_CLICK_ATTEMPTS} times per skip-ad process. The
+     * first attempt uses ACTION_CLICK, which cannot hit anything but the widget itself but is
+     * ignored by some ad SDKs (performAction() returns true although nothing happens). If the
+     * same widget is still on screen {@link #CLICK_RETRY_MIN_INTERVAL_MS} later, the second
+     * attempt is a real touch gesture at the widget's centre.
+     */
+    private static final int MAX_CLICK_ATTEMPTS = 2;
+    private static final long CLICK_RETRY_MIN_INTERVAL_MS = 500;
+
+    private static final class ClickAttempt {
+        int attempts;
+        long lastUptime;
+    }
     private volatile List<String> keyWordList = Collections.emptyList();
 
     // immutable snapshots of the user rules, replaced wholesale when settings change
@@ -176,7 +214,10 @@ public class TouchHelperServiceImpl {
             packageManager = service.getPackageManager();
             updatePackage();
 
-            clickedWidgets.clear();
+            keyguardManager = (KeyguardManager) service.getSystemService(Context.KEYGUARD_SERVICE);
+            powerManager = (PowerManager) service.getSystemService(Context.POWER_SERVICE);
+
+            session = new ClickSession();
 
             // install receiver and handler for broadcasting events
             InstallReceiverAndHandler();
@@ -222,7 +263,11 @@ public class TouchHelperServiceImpl {
     private void InstallReceiverAndHandler() {
         // install broadcast receiver for package add / remove; device unlock
         userPresentReceiver = new UserPresentReceiver();
-        service.registerReceiver(userPresentReceiver, new IntentFilter(Intent.ACTION_USER_PRESENT));
+        // USER_PRESENT is only sent when a keyguard is dismissed; SCREEN_ON covers devices
+        // without a lock screen. Both are protected system broadcasts.
+        IntentFilter wakeup = new IntentFilter(Intent.ACTION_USER_PRESENT);
+        wakeup.addAction(Intent.ACTION_SCREEN_ON);
+        service.registerReceiver(userPresentReceiver, wakeup);
         packageChangeReceiver = new PackageChangeReceiver();
         IntentFilter actions = new IntentFilter();
         actions.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -259,10 +304,7 @@ public class TouchHelperServiceImpl {
                     showActivityCustomizationDialog();
                     break;
                 case TouchHelperService.ACTION_START_SKIPAD:
-                    if (BuildConfig.DEBUG) {
-                        Log.d(TAG, "resume from wakeup and start to skip ads now ...");
-                    }
-                    startSkipAdProcess();
+                    resumeSkipAdAfterWakeup();
                     break;
                 case TouchHelperService.ACTION_STOP_SKIPAD:
                     stopSkipAdProcessInner();
@@ -340,6 +382,7 @@ public class TouchHelperServiceImpl {
                             // since it's an activity in another package, it must be a new activity, save them
                             currentPackageName = pkgName;
                             currentActivityName = actName;
+                            wakeupPending = false;
                             // stop current skip ad process if it exists
                             stopSkipAdProcess();
                             if(setPackages.contains(pkgName)) {
@@ -347,8 +390,29 @@ public class TouchHelperServiceImpl {
                                 // this is the only place to start skip ad process
                                 startSkipAdProcess();
                             }
+                        } else if (!wakeupPending && isScreenLockedOrOff()) {
+                            // a system window (keyguard) covers the current app while the device
+                            // is locked or dark: whatever comes back afterwards is a warm start
+                            if (BuildConfig.DEBUG) {
+                                Log.d(TAG, "lock screen shown over " + currentPackageName + ", expecting a warm start");
+                            }
+                            wakeupPending = true;
                         }
                     } else {
+                        if (wakeupPending && !isScreenLockedOrOff()) {
+                            // the covered app is back and the device is unlocked: warm start
+                            wakeupPending = false;
+                            if (setPackages.contains(pkgName)) {
+                                if (BuildConfig.DEBUG) {
+                                    Log.d(TAG, "warm start of " + pkgName + " after the lock screen, start to skip ads");
+                                }
+                                stopSkipAdProcess();
+                                startSkipAdProcess();
+                                // the unlock animation may still own the active window right
+                                // now, so look again once the app has settled
+                                scheduleWakeupRescan(pkgName);
+                            }
+                        }
                         // current package, we just save the activity
                         if(isActivity && !currentActivityName.equals(actName)) {
                             // new activity in the package. Some apps show the ad activity only
@@ -413,22 +477,22 @@ public class TouchHelperServiceImpl {
 
                     // third: skip ads by keywords. Both widget and keyword matching share one
                     // traversal of the window; a window state change always gets a full scan.
-                    if (setTargetedWidgets != null || skipAdByKeyword) {
+                    if (activeWidgetRules() != null || skipAdByKeyword) {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "method by keywords in STATE_CHANGED");
                         }
-                        scheduleTraversal(rootOfActiveTargetWindow(), setTargetedWidgets, skipAdByKeyword, true);
+                        scheduleTraversal(rootOfActiveTargetWindow(), activeWidgetRules(), skipAdByKeyword, true);
                     }
                     break;
                 case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:
                     if(!setPackages.contains(tempPkgName.toString())) {
                         break;
                     }
-                    if (setTargetedWidgets != null || skipAdByKeyword) {
+                    if (activeWidgetRules() != null || skipAdByKeyword) {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "method by keywords in CONTENT_CHANGED");
                         }
-                        scheduleTraversal(event.getSource(), setTargetedWidgets, skipAdByKeyword, false);
+                        scheduleTraversal(event.getSource(), activeWidgetRules(), skipAdByKeyword, false);
                     }
                     break;
             }
@@ -605,7 +669,7 @@ public class TouchHelperServiceImpl {
             rescanScheduled = false;
         }
         if (!skipAdRunning) return;
-        Set<PackageWidgetDescription> widgets = setTargetedWidgets;
+        Set<PackageWidgetDescription> widgets = activeWidgetRules();
         if (widgets == null && !skipAdByKeyword) return;
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "rescan active window after evicted sub-trees");
@@ -649,6 +713,11 @@ public class TouchHelperServiceImpl {
     void iterateNodesToSkipAd(AccessibilityNodeInfo root, Set<PackageWidgetDescription> widgets, boolean byKeyword) {
         if (root == null) return;
         final List<String> keywords = byKeyword ? keyWordList : null;
+        // the process this scan belongs to; all click bookkeeping goes to this object only
+        final ClickSession session = this.session;
+        if (session.widgetRulesDone) {
+            widgets = null;
+        }
         final ArrayDeque<AccessibilityNodeInfo> queue = new ArrayDeque<>(64);
         queue.add(root);
         final Rect bounds = new Rect();
@@ -659,19 +728,19 @@ public class TouchHelperServiceImpl {
         boolean handled = false;
         int visited = 0;
         try {
-            while (skipAdRunning) {
+            while (skipAdRunning && this.session == session) {
                 AccessibilityNodeInfo node = queue.poll();
                 if (node == null) break;
                 visited++;
-                if (widgets != null && skipAdByTargetedWidget(node, widgets, bounds)) {
+                if (widgets != null && skipAdByTargetedWidget(node, widgets, bounds, session)) {
                     handled = true;
                     recycleNode(node);
                     break;
                 }
                 boolean isCandidate = false;
-                if (keywords != null && keywordCandidate == null && matchesKeyword(node, keywords)) {
+                if (keywords != null && keywordCandidate == null && matchesKeyword(node, keywords, session)) {
                     if (widgets == null) {
-                        clickKeywordNode(node);
+                        clickKeywordNode(node, keywords, session);
                         handled = true;
                         recycleNode(node);
                         break;
@@ -690,8 +759,8 @@ public class TouchHelperServiceImpl {
                     recycleNode(node);
                 }
             }
-            if (!handled && keywordCandidate != null && skipAdRunning) {
-                clickKeywordNode(keywordCandidate);
+            if (!handled && keywordCandidate != null && skipAdRunning && this.session == session) {
+                clickKeywordNode(keywordCandidate, keywords, session);
             }
         } finally {
             recycleNode(keywordCandidate);
@@ -719,7 +788,7 @@ public class TouchHelperServiceImpl {
     /**
      * 判断节点的 Text / Description 是否包含关键字，且尚未在本轮跳过流程中被点击过
      */
-    private boolean matchesKeyword(AccessibilityNodeInfo node, List<String> keywords) {
+    private boolean matchesKeyword(AccessibilityNodeInfo node, List<String> keywords, ClickSession session) {
         CharSequence description = node.getContentDescription();
         CharSequence text = node.getText();
         if ((description == null || description.length() == 0) && (text == null || text.length() == 0)) {
@@ -739,37 +808,169 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "identify keyword = " + keyword);
         }
-        return !clickedWidgets.contains(Utilities.describeAccessibilityNode(node));
+        return canClick(clickKey(node), session);
     }
 
     /**
      * 点击包含关键字的控件
      */
-    private void clickKeywordNode(AccessibilityNodeInfo node) {
-        String nodeDesc = Utilities.describeAccessibilityNode(node);
+    private void clickKeywordNode(AccessibilityNodeInfo node, final List<String> keywords, ClickSession session) {
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, nodeDesc);
+            Log.d(TAG, Utilities.describeAccessibilityNode(node));
         }
-        if (!clickedWidgets.add(nodeDesc)) {
-            // already clicked this widget in this skip-ad process
-            return;
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        clickNode(node, bounds, false, "正在根据关键字跳过广告...", session, refreshed -> {
+            CharSequence text = refreshed.getText();
+            CharSequence description = refreshed.getContentDescription();
+            return SkipAdRules.findKeyword(text == null ? null : text.toString(),
+                    description == null ? null : description.toString(), keywords, SelfPackageName) != null;
+        });
+    }
+
+    /**
+     * Identity of a widget within one skip-ad process: class, view id and screen bounds. The
+     * text is left out on purpose so that a countdown label ("跳过 5" → "跳过 4") stays the same
+     * widget and its click attempts are counted together.
+     */
+    private static String clickKey(AccessibilityNodeInfo node) {
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        StringBuilder key = new StringBuilder(96);
+        key.append(node.getClassName()).append('|').append(node.getViewIdResourceName()).append('|')
+                .append(bounds.left).append(',').append(bounds.top).append(',')
+                .append(bounds.right).append(',').append(bounds.bottom);
+        return key.toString();
+    }
+
+    /** whether the widget may be clicked now: not exhausted, and not clicked again too soon */
+    private boolean canClick(String key, ClickSession session) {
+        ClickAttempt attempt = session.clickedWidgets.get(key);
+        if (attempt == null) return true;
+        return attempt.attempts < MAX_CLICK_ATTEMPTS
+                && SystemClock.uptimeMillis() - attempt.lastUptime >= CLICK_RETRY_MIN_INTERVAL_MS;
+    }
+
+    /** Re-evaluates a rule against a node that was just refreshed from the app. */
+    private interface Recheck {
+        boolean stillMatches(AccessibilityNodeInfo refreshed);
+    }
+
+    private enum ClickResult {
+        /** nothing was issued: exhausted, too soon, or the gesture was refused by the checks */
+        NONE,
+        /** a click was issued and the widget may get one more attempt later */
+        CLICKED,
+        /** a click was issued and this was the last attempt for the widget */
+        FINAL
+    }
+
+    /**
+     * Click a matched widget, escalating from ACTION_CLICK to a touch gesture when the widget
+     * is still on screen at the next sighting (see {@link #MAX_CLICK_ATTEMPTS}). Only clicks
+     * that are actually issued count as attempts.
+     *
+     * @param gestureOnly skip ACTION_CLICK altogether (the "onlyClick" flag of widget rules)
+     * @param session     the process this click belongs to; attempts are recorded there only
+     * @param recheck     confirms the rule still matches after the node has been refreshed
+     */
+    private ClickResult clickNode(AccessibilityNodeInfo node, Rect bounds, boolean gestureOnly, String toast,
+                                  ClickSession session, Recheck recheck) {
+        String key = clickKey(node);
+        if (!canClick(key, session)) {
+            return ClickResult.NONE;
         }
-        ShowToastInIntentService("正在根据关键字跳过广告...");
-        boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        ClickAttempt attempt = session.clickedWidgets.get(key);
+        int done = attempt == null ? 0 : attempt.attempts;
+        boolean useGesture = gestureOnly || done > 0;
+        boolean issued;
+        if (!useGesture) {
+            boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+            if (!clicked) {
+                // the label itself is often not clickable, its container is
+                AccessibilityNodeInfo parent = node.getParent();
+                if (parent != null) {
+                    clicked = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    recycleNode(parent);
+                }
+            }
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "self clicked = " + clicked);
+            }
+            // ACTION_CLICK was issued either way; a rejected one is retried as a gesture now
+            issued = true;
+            if (!clicked) {
+                clickByGesture(node, bounds, recheck);
+            }
+        } else {
+            issued = clickByGesture(node, bounds, recheck);
+        }
+        if (!issued) {
+            return ClickResult.NONE;
+        }
+        // recorded in the session this scan started under: if a new process began while the
+        // click was in flight, this lands in the old, discarded session and never in the new one
+        if (attempt == null) {
+            attempt = new ClickAttempt();
+            session.clickedWidgets.put(key, attempt);
+        }
+        attempt.attempts = done + 1;
+        attempt.lastUptime = SystemClock.uptimeMillis();
+        ShowToastInIntentService(toast);
+        return attempt.attempts >= MAX_CLICK_ATTEMPTS ? ClickResult.FINAL : ClickResult.CLICKED;
+    }
+
+    /**
+     * Touch gesture at the centre of the widget. The node may be a snapshot taken before an
+     * earlier click closed the ad, so it is refreshed first and the gesture is only dispatched
+     * when the widget still exists in a window we handle, still matches its rule, and its
+     * centre is a visible spot on screen.
+     *
+     * @return true when a gesture was dispatched
+     */
+    private boolean clickByGesture(AccessibilityNodeInfo node, Rect bounds, Recheck recheck) {
+        if (!node.refresh()) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "gesture click skipped, widget is gone");
+            }
+            return false;
+        }
+        CharSequence pkg = node.getPackageName();
+        if (pkg == null || !setPackages.contains(pkg.toString())) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "gesture click skipped, widget now belongs to " + pkg);
+            }
+            return false;
+        }
+        if (recheck != null && !recheck.stillMatches(node)) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "gesture click skipped, widget no longer matches the rule");
+            }
+            return false;
+        }
+        node.getBoundsInScreen(bounds);
+        DisplayMetrics metrics = service.getResources().getDisplayMetrics();
+        int x = bounds.centerX(), y = bounds.centerY();
+        boolean onScreen = !bounds.isEmpty() && x >= 0 && y >= 0
+                && (metrics.widthPixels <= 0 || x < metrics.widthPixels)
+                && (metrics.heightPixels <= 0 || y < metrics.heightPixels);
+        if (!onScreen || !node.isVisibleToUser()) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "gesture click skipped, widget not on screen: " + bounds.toShortString());
+            }
+            return false;
+        }
+        boolean dispatched = click(x, y, 0, 20);
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "self clicked = " + clicked);
+            Log.d(TAG, "gesture clicked at (" + x + ", " + y + ") dispatched = " + dispatched);
         }
-        if (!clicked) {
-            Rect rect = new Rect();
-            node.getBoundsInScreen(rect);
-            click(rect.centerX(), rect.centerY(), 0, 20);
-        }
+        return dispatched;
     }
 
     /**
      * 查找并点击由 ActivityWidgetDescription 定义的控件
      */
-    private boolean skipAdByTargetedWidget(AccessibilityNodeInfo node, Set<PackageWidgetDescription> set, Rect bounds) {
+    private boolean skipAdByTargetedWidget(AccessibilityNodeInfo node, Set<PackageWidgetDescription> set, Rect bounds, ClickSession session) {
         node.getBoundsInScreen(bounds);
         CharSequence cId = node.getViewIdResourceName();
         CharSequence cDescribe = node.getContentDescription();
@@ -786,27 +987,26 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Find skip-ad by Widget " + e.toString());
         }
-        String nodeDesc = Utilities.describeAccessibilityNode(node);
-        if (!clickedWidgets.add(nodeDesc)) {
-            // avoid multiple click on the same widget
+        final PackageWidgetDescription rule = e;
+        ClickResult result = clickNode(node, bounds, e.onlyClick, "正在根据控件跳过广告...", session, refreshed -> {
+            Rect r = new Rect();
+            refreshed.getBoundsInScreen(r);
+            CharSequence id = refreshed.getViewIdResourceName();
+            CharSequence desc = refreshed.getContentDescription();
+            CharSequence text = refreshed.getText();
+            return SkipAdRules.findWidget(r.left, r.top, r.right, r.bottom,
+                    id == null ? null : id.toString(), desc == null ? null : desc.toString(),
+                    text == null ? null : text.toString(), Collections.singleton(rule)) != null;
+        });
+        if (result == ClickResult.NONE) {
+            // already handled in this process (or not clickable right now), keep looking
             return false;
         }
-        ShowToastInIntentService("正在根据控件跳过广告...");
-        if (e.onlyClick) {
-            click(bounds.centerX(), bounds.centerY(), 0, 20);
-        } else if (!node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            AccessibilityNodeInfo parent = node.getParent();
-            boolean parentClicked = false;
-            if (parent != null) {
-                parentClicked = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                recycleNode(parent);
-            }
-            if (!parentClicked) {
-                click(bounds.centerX(), bounds.centerY(), 0, 20);
-            }
+        if (result == ClickResult.FINAL) {
+            // the widget got its last attempt: stop looking for widget rules in *this* process
+            // (a newer process that reuses the same rule set keeps them)
+            session.widgetRulesDone = true;
         }
-        // clear setWidgets, stop trying
-        if (setTargetedWidgets == set) setTargetedWidgets = null;
         return true;
     }
 
@@ -866,6 +1066,65 @@ public class TouchHelperServiceImpl {
         return service.dispatchGesture(builder.build(), null, null);
     }
 
+    // apps that show a warm-start ad after the screen was unlocked do so within about a second
+    private static final long WAKEUP_RESCAN_DELAY_MS = 1000;
+
+    /**
+     * The screen was turned on or unlocked while an app was in the foreground. Many apps show a
+     * splash ad on such a warm start, so restart the skip-ad process for that app and scan its
+     * window right away and again a moment later (the ad renders after the app resumes).
+     * Nothing happens when the foreground app is not one we handle (launcher, whitelisted app,
+     * keyguard, IME).
+     */
+    private void resumeSkipAdAfterWakeup() {
+        final String pkg = currentPackageName;
+        if (pkg == null || !setPackages.contains(pkg)) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "wakeup while in " + pkg + ", not a target package");
+            }
+            return;
+        }
+        if (isScreenLockedOrOff()) {
+            // SCREEN_ON with the keyguard still up: wait for the app's window to come back
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "wakeup while in " + pkg + " but still locked, expecting a warm start");
+            }
+            wakeupPending = true;
+            return;
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "wakeup while in " + pkg + ", start to skip ads now ...");
+        }
+        wakeupPending = false;
+        startSkipAdProcess();
+        // widget rules are resolved here instead of waiting for a window-state event
+        skipAdByActivityWidget = false;
+        setTargetedWidgets = mapPackageWidgets.get(pkg);
+        scheduleTraversal(rootOfActiveTargetWindow(), activeWidgetRules(), skipAdByKeyword, true);
+        scheduleWakeupRescan(pkg);
+    }
+
+    /** one more full scan of the app's window a moment after a warm start */
+    private void scheduleWakeupRescan(final String pkg) {
+        receiverHandler.postDelayed(() -> {
+            if (skipAdRunning && pkg.equals(currentPackageName)) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "warm start rescan of " + pkg);
+                }
+                scheduleTraversal(rootOfActiveTargetWindow(), activeWidgetRules(), skipAdByKeyword, true);
+            }
+        }, WAKEUP_RESCAN_DELAY_MS);
+    }
+
+    private boolean isScreenLockedOrOff() {
+        try {
+            return (keyguardManager != null && keyguardManager.isKeyguardLocked())
+                    || (powerManager != null && !powerManager.isInteractive());
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     /**
      * start the skip-ad process
      */
@@ -873,13 +1132,13 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Start Skip-ad process");
         }
+        session = new ClickSession();
         skipAdRunning = true;
         skipAdByActivityPosition = true;
         skipAdByActivityWidget = true;
         skipAdByKeyword = true;
         setTargetedWidgets = null;
         clearPendingScans();
-        clickedWidgets.clear();
 
         // cancel all methods N seconds later
         receiverHandler.removeMessages(TouchHelperService.ACTION_STOP_SKIPAD);
