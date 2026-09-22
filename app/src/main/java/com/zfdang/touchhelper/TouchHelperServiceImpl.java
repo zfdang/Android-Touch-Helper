@@ -417,7 +417,7 @@ public class TouchHelperServiceImpl {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "method by keywords in STATE_CHANGED");
                         }
-                        scheduleTraversal(service.getRootInActiveWindow(), setTargetedWidgets, skipAdByKeyword, true);
+                        scheduleTraversal(rootOfActiveTargetWindow(), setTargetedWidgets, skipAdByKeyword, true);
                     }
                     break;
                 case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:
@@ -610,7 +610,27 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "rescan active window after evicted sub-trees");
         }
-        scheduleTraversal(service.getRootInActiveWindow(), widgets, skipAdByKeyword, true);
+        scheduleTraversal(rootOfActiveTargetWindow(), widgets, skipAdByKeyword, true);
+    }
+
+    /**
+     * Root of the active window, or null when that window does not belong to one of the
+     * packages we handle. Full-window scans are requested asynchronously, so by the time we
+     * look the active window may be an IME, the launcher or a whitelisted app; those windows
+     * are excluded from event handling and must never be scanned or clicked either.
+     */
+    private AccessibilityNodeInfo rootOfActiveTargetWindow() {
+        AccessibilityNodeInfo root = service.getRootInActiveWindow();
+        if (root == null) return null;
+        CharSequence pkg = root.getPackageName();
+        if (pkg == null || !setPackages.contains(pkg.toString())) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "active window belongs to " + pkg + ", not scanning it");
+            }
+            recycleNode(root);
+            return null;
+        }
+        return root;
     }
 
     /** number of sub-trees waiting to be scanned; exposed for tests */

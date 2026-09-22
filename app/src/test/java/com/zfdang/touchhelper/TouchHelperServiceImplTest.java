@@ -42,22 +42,36 @@ public class TouchHelperServiceImplTest {
 
     private static final String AD_PKG = "com.example.ad";
     private static final String AD_ACTIVITY = "com.example.ad.SplashActivity";
+    private static final String IME_PKG = "com.example.keyboard";
 
-    private TouchHelperService service;
+    /** Lets a test decide what the active window looks like. */
+    public static class RootService extends TouchHelperService {
+        AccessibilityNodeInfo activeRoot;
+        int rootReads;
+
+        @Override
+        public AccessibilityNodeInfo getRootInActiveWindow() {
+            rootReads++;
+            return activeRoot == null ? null : AccessibilityNodeInfo.obtain(activeRoot);
+        }
+    }
+
+    private RootService service;
     private TouchHelperServiceImpl impl;
     private ScheduledExecutorService executor;
 
     @Before
     public void setUp() throws Exception {
-        service = Robolectric.setupService(TouchHelperService.class);
+        service = Robolectric.setupService(RootService.class);
         service.onServiceConnected();
-        impl = (TouchHelperServiceImpl) get(service, "serviceImpl");
+        impl = (TouchHelperServiceImpl) getFrom(TouchHelperService.class, service, "serviceImpl");
         assertNotNull(impl);
         assertNotNull("service init failed, see logcat", impl.receiverHandler);
         executor = (ScheduledExecutorService) get(impl, "taskExecutorService");
         assertNotNull(executor);
         // pretend the ad app is an installed, non-whitelisted launcher app
         set(impl, "setPackages", new HashSet<>(Collections.singleton(AD_PKG)));
+        set(impl, "setIMEApps", new HashSet<>(Collections.singleton(IME_PKG)));
         set(impl, "keyWordList", Collections.singletonList("跳过"));
     }
 
@@ -69,7 +83,11 @@ public class TouchHelperServiceImplTest {
     // ------------------------------------------------------------------ helpers
 
     private static Object get(Object target, String name) throws Exception {
-        Field f = target.getClass().getDeclaredField(name);
+        return getFrom(target.getClass(), target, name);
+    }
+
+    private static Object getFrom(Class<?> type, Object target, String name) throws Exception {
+        Field f = type.getDeclaredField(name);
         f.setAccessible(true);
         return f.get(target);
     }
@@ -119,7 +137,12 @@ public class TouchHelperServiceImplTest {
 
     /** A node whose clicks are counted in {@code clicks}. */
     private static AccessibilityNodeInfo node(String cls, String text, String id, Rect bounds, AtomicInteger clicks) {
+        return node(AD_PKG, cls, text, id, bounds, clicks);
+    }
+
+    private static AccessibilityNodeInfo node(String pkg, String cls, String text, String id, Rect bounds, AtomicInteger clicks) {
         AccessibilityNodeInfo n = AccessibilityNodeInfo.obtain();
+        n.setPackageName(pkg);
         n.setClassName(cls);
         n.setText(text);
         n.setViewIdResourceName(id);
@@ -147,6 +170,8 @@ public class TouchHelperServiceImplTest {
     private void startSkipAdProcess() throws Exception {
         impl.onAccessibilityEvent(stateChanged(AD_PKG, AD_ACTIVITY));
         assertTrue(skipAdRunning());
+        // the window-state scan above reads the active window once; tests count reads after it
+        service.rootReads = 0;
     }
 
     // ------------------------------------------------------------------ tests
@@ -433,6 +458,80 @@ public class TouchHelperServiceImplTest {
         assertEquals(1, skip.get());
         assertEquals(0, other.get());
         assertNotNull("no widget matched, so widget matching stays active", get(impl, "setTargetedWidgets"));
+    }
+
+    private void evictBySpamming(int count) {
+        for (int i = 0; i < count; i++) {
+            impl.onAccessibilityEvent(contentChanged(AD_PKG,
+                    node("android.widget.TextView", "Loading", "com.example.ad:id/label" + i, new Rect(0, i * 10, 100, i * 10 + 10), null)));
+        }
+    }
+
+    @Test
+    public void rescan_neverScansAnInputMethodWindow() throws Exception {
+        startSkipAdProcess();
+        CountDownLatch release = new CountDownLatch(1);
+        executor.execute(() -> {
+            try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+        });
+        AtomicInteger keyboardClicks = new AtomicInteger();
+        evictBySpamming(5);
+        // the keyboard pops up over the ad: IME window-state events keep the process running
+        service.activeRoot = node(IME_PKG, "android.widget.TextView", "跳过", "ime:id/suggestion", new Rect(0, 1500, 300, 1600), keyboardClicks);
+        impl.onAccessibilityEvent(stateChanged(IME_PKG, "android.inputmethodservice.SoftInputWindow"));
+        assertTrue(skipAdRunning());
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
+        release.countDown();
+        awaitExecutor();
+        assertTrue("the rescan did look at the active window", service.rootReads > 0);
+        assertEquals("a window of an excluded package must never be clicked", 0, keyboardClicks.get());
+    }
+
+    @Test
+    public void rescan_coversAnEvictedSubTreeOfTheTargetApp() throws Exception {
+        startSkipAdProcess();
+        CountDownLatch release = new CountDownLatch(1);
+        executor.execute(() -> {
+            try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+        });
+        AtomicInteger skipClicks = new AtomicInteger();
+        AccessibilityNodeInfo skip = node("android.widget.TextView", "跳过", "com.example.ad:id/skip", new Rect(800, 100, 1000, 180), skipClicks);
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, skip));
+        evictBySpamming(4); // pushes the skip sub-tree out of the queue
+        service.activeRoot = skip;
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
+        assertTrue("the rescan is scheduled without waiting for the worker", service.rootReads > 0);
+        release.countDown();
+        awaitExecutor();
+        assertEquals(1, skipClicks.get());
+    }
+
+    @Test
+    public void rescan_isNotPerformedOnceTheProcessStopped() throws Exception {
+        startSkipAdProcess();
+        CountDownLatch release = new CountDownLatch(1);
+        executor.execute(() -> {
+            try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+        });
+        AtomicInteger clicks = new AtomicInteger();
+        evictBySpamming(5);
+        service.activeRoot = node("android.widget.TextView", "跳过", "com.example.ad:id/skip", new Rect(800, 100, 1000, 180), clicks);
+        impl.onAccessibilityEvent(stateChanged("com.example.other", "com.example.other.Main"));
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
+        release.countDown();
+        awaitExecutor();
+        assertEquals(0, clicks.get());
+        assertEquals(0, service.rootReads);
+    }
+
+    @Test
+    public void stateChanged_fullWindowScanIgnoresAWindowOfAnotherPackage() throws Exception {
+        AtomicInteger clicks = new AtomicInteger();
+        // the active window already moved on to the launcher when the event is handled
+        service.activeRoot = node("com.example.launcher", "android.widget.TextView", "跳过", "launcher:id/x", new Rect(0, 0, 100, 100), clicks);
+        startSkipAdProcess();
+        awaitExecutor();
+        assertEquals(0, clicks.get());
     }
 
     @Test
