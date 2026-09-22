@@ -96,6 +96,9 @@ public class TouchHelperServiceImpl {
      */
     private static final int MAX_CLICK_ATTEMPTS = 2;
     private static final long CLICK_RETRY_MIN_INTERVAL_MS = 500;
+    // incremented by every startSkipAdProcess(); a traversal or click that started under an
+    // older generation must not touch the state of the new process
+    private volatile int skipAdGeneration;
 
     private static final class ClickAttempt {
         int attempts;
@@ -700,6 +703,7 @@ public class TouchHelperServiceImpl {
     void iterateNodesToSkipAd(AccessibilityNodeInfo root, Set<PackageWidgetDescription> widgets, boolean byKeyword) {
         if (root == null) return;
         final List<String> keywords = byKeyword ? keyWordList : null;
+        final int generation = skipAdGeneration;
         final ArrayDeque<AccessibilityNodeInfo> queue = new ArrayDeque<>(64);
         queue.add(root);
         final Rect bounds = new Rect();
@@ -710,7 +714,7 @@ public class TouchHelperServiceImpl {
         boolean handled = false;
         int visited = 0;
         try {
-            while (skipAdRunning) {
+            while (skipAdRunning && skipAdGeneration == generation) {
                 AccessibilityNodeInfo node = queue.poll();
                 if (node == null) break;
                 visited++;
@@ -741,7 +745,7 @@ public class TouchHelperServiceImpl {
                     recycleNode(node);
                 }
             }
-            if (!handled && keywordCandidate != null && skipAdRunning) {
+            if (!handled && keywordCandidate != null && skipAdRunning && skipAdGeneration == generation) {
                 clickKeywordNode(keywordCandidate, keywords);
             }
         } finally {
@@ -862,6 +866,7 @@ public class TouchHelperServiceImpl {
         }
         ClickAttempt attempt = clickedWidgets.get(key);
         int done = attempt == null ? 0 : attempt.attempts;
+        final int generation = skipAdGeneration;
         boolean useGesture = gestureOnly || done > 0;
         boolean issued;
         if (!useGesture) {
@@ -886,6 +891,11 @@ public class TouchHelperServiceImpl {
             issued = clickByGesture(node, bounds, recheck);
         }
         if (!issued) {
+            return ClickResult.NONE;
+        }
+        if (skipAdGeneration != generation) {
+            // a new skip-ad process started while the click was in flight (the user left and
+            // re-entered the app); its fresh attempt table must not inherit this record
             return ClickResult.NONE;
         }
         if (attempt == null) {
@@ -1109,6 +1119,7 @@ public class TouchHelperServiceImpl {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Start Skip-ad process");
         }
+        skipAdGeneration++;
         skipAdRunning = true;
         skipAdByActivityPosition = true;
         skipAdByActivityWidget = true;

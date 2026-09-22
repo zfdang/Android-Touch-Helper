@@ -732,6 +732,61 @@ public class TouchHelperServiceImplTest {
     }
 
     @Test
+    public void click_finishedUnderAnOlderProcessDoesNotCountForTheNewOne() throws Exception {
+        startSkipAdProcess();
+        // ACTION_CLICK blocks (slow app) while the user leaves and re-enters the app
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger actionClicks = new AtomicInteger();
+        AccessibilityNodeInfo slow = node("android.widget.TextView", "跳过", "com.example.ad:id/skip", new Rect(800, 100, 1000, 180), null);
+        shadowOf(slow).setOnPerformActionListener((action, args) -> {
+            actionClicks.incrementAndGet();
+            entered.countDown();
+            try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+            return true;
+        });
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, slow));
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+
+        impl.onAccessibilityEvent(stateChanged("com.example.other", "com.example.other.Main"));
+        startSkipAdProcess();               // new process, fresh attempt table
+        release.countDown();                // old click returns now
+        awaitExecutor();
+        assertEquals(1, actionClicks.get());
+
+        // the same button in the new ad: first attempt again, not blocked and not a gesture
+        impl.iterateNodesToSkipAd(stubbornSkipButton("跳过", actionClicks), null, true);
+        assertEquals(2, actionClicks.get());
+        assertEquals(0, gestures());
+    }
+
+    @Test
+    public void traversal_startedUnderAnOlderProcessStopsWhenANewOneBegins() throws Exception {
+        startSkipAdProcess();
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger laterClicks = new AtomicInteger();
+        // first child blocks in ACTION_CLICK, second child would be clicked by a continuing scan
+        AccessibilityNodeInfo root = node("android.widget.FrameLayout", null, null, new Rect(0, 0, 1080, 1920), null);
+        AccessibilityNodeInfo slow = node("android.widget.TextView", "跳过", "com.example.ad:id/a", new Rect(0, 0, 100, 50), null);
+        shadowOf(slow).setOnPerformActionListener((action, args) -> {
+            entered.countDown();
+            try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+            return false;                   // rejected, so the scan would go on
+        });
+        shadowOf(slow).setRefreshReturnValue(false); // and no gesture either
+        AccessibilityNodeInfo later = node("android.widget.TextView", "跳过", "com.example.ad:id/b", new Rect(0, 100, 100, 150), laterClicks);
+        shadowOf(root).addChild(slow);
+        shadowOf(root).addChild(later);
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, root));
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+
+        impl.onAccessibilityEvent(stateChanged("com.example.other", "com.example.other.Main"));
+        startSkipAdProcess();
+        release.countDown();
+        awaitExecutor();
+        assertEquals("the stale scan must not click into the new process", 0, laterClicks.get());
+    }
+
+    @Test
     public void click_attemptsAreForgottenByANewProcess() throws Exception {
         startSkipAdProcess();
         AtomicInteger actionClicks = new AtomicInteger();
