@@ -159,27 +159,23 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             whitelist.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
-                    // find all packages
-                    List<String> list = new ArrayList<>();
+                    // find all launcher packages. ResolveInfo already carries the ApplicationInfo,
+                    // so no extra PackageManager round-trip per app is needed. Icons are loaded
+                    // lazily by the adapter instead of decoding every icon up-front on the UI thread.
                     Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
                     List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
-                    for (ResolveInfo e : ResolveInfoList) {
-//                        Log.d(TAG, "launcher - " + e.activityInfo.packageName);
-                        list.add(e.activityInfo.packageName);
-                    }
-
-                    // generate AppInformation for packages
-                    final ArrayList<AppInformation> listApp = new ArrayList<>();
+                    final ArrayList<AppInformation> listApp = new ArrayList<>(ResolveInfoList.size());
+                    Set<String> seen = new HashSet<>();
                     Set<String> pkgWhitelist = mSetting.getWhitelistPackages();
-                    for (String pkgName : list) {
-                        try {
-                            ApplicationInfo info = packageManager.getApplicationInfo(pkgName, PackageManager.GET_META_DATA);
-                            AppInformation appInfo = new AppInformation(pkgName, packageManager.getApplicationLabel(info).toString(), packageManager.getApplicationIcon(info));
-                            appInfo.isChecked = pkgWhitelist.contains(pkgName);
-                            listApp.add(appInfo);
-                        } catch (PackageManager.NameNotFoundException e) {
-                            Log.e(TAG, Utilities.getTraceStackInString(e));
+                    for (ResolveInfo e : ResolveInfoList) {
+                        ApplicationInfo info = e.activityInfo.applicationInfo;
+                        String pkgName = e.activityInfo.packageName;
+                        if (info == null || !seen.add(pkgName)) {
+                            continue;
                         }
+                        AppInformation appInfo = new AppInformation(pkgName, packageManager.getApplicationLabel(info).toString(), info);
+                        appInfo.isChecked = pkgWhitelist.contains(pkgName);
+                        listApp.add(appInfo);
                     }
 
                     // sort apps
@@ -214,7 +210,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                             }
                             AppInformation app = listApp.get(position);
                             holder.textView.setText(app.applicationName);
-                            holder.imageView.setImageDrawable(app.applicationIcon);
+                            holder.imageView.setImageDrawable(app.getIcon(packageManager));
                             holder.checkBox.setChecked(app.isChecked);
                             return convertView;
                         }
@@ -280,20 +276,29 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                     String packageName;
                     String applicationName;
                     String applicationNamePinyin;
+                    final ApplicationInfo applicationInfo;
                     Drawable applicationIcon;
                     boolean isChecked;
 
-                    public AppInformation(String packageName, String applicationName, Drawable applicationIcon) {
+                    public AppInformation(String packageName, String applicationName, ApplicationInfo applicationInfo) {
                         this.packageName = packageName;
                         this.applicationName = applicationName;
+                        this.applicationInfo = applicationInfo;
                         try {
                             applicationNamePinyin = PinyinHelper.toHanYuPinyinString(this.applicationName, outputFormat, "", true);
                         } catch (BadHanyuPinyinOutputFormatCombination badHanyuPinyinOutputFormatCombination) {
                             applicationNamePinyin = applicationName;
                             Log.e(TAG, Utilities.getTraceStackInString(badHanyuPinyinOutputFormatCombination));
                         }
-                        this.applicationIcon = applicationIcon;
                         this.isChecked = false;
+                    }
+
+                    /** Decodes the icon on first display and caches it for the lifetime of the dialog. */
+                    Drawable getIcon(PackageManager pm) {
+                        if (applicationIcon == null) {
+                            applicationIcon = pm.getApplicationIcon(applicationInfo);
+                        }
+                        return applicationIcon;
                     }
 
                     @Override
@@ -301,7 +306,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                         AppInformation other = (AppInformation) o;
 
                         if(this.isChecked && !other.isChecked) {
-                            return -11;
+                            return -1;
                         } else if (!this.isChecked && other.isChecked) {
                             return 1;
                         } else {

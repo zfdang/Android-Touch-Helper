@@ -15,7 +15,7 @@ import com.zfdang.TouchHelperApp;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,30 +50,30 @@ public class Settings {
         // initial duration of skip ad process
         iSkipAdDuration = mPreference.getInt(SKIP_AD_DURATION, 4);
 
-        // find all system packages, and set them as default value for whitelist
-        PackageManager packageManager = TouchHelperApp.getAppContext().getPackageManager();
-        Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-        List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
-        Set<String> pkgSystems = new HashSet<>();
-        for (ResolveInfo e : ResolveInfoList) {
-            if ((e.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == ApplicationInfo.FLAG_SYSTEM) {
-                pkgSystems.add(e.activityInfo.packageName);
-            }
-        }
-
         // init whitelist of packages
         // https://stackoverflow.com/questions/10720028/android-sharedpreferences-not-saving
         // Note that you must not modify the set instance returned by this call. The consistency of the stored data is not guaranteed if you do, nor is your ability to modify the instance at all.
-        setWhiteListPackages = new HashSet<String>(mPreference.getStringSet(WHITELIST_PACKAGE, pkgSystems));
+        Set<String> storedWhitelist = mPreference.getStringSet(WHITELIST_PACKAGE, null);
+        if (storedWhitelist != null) {
+            setWhiteListPackages = new HashSet<>(storedWhitelist);
+        } else {
+            // first run only: default the whitelist to all system packages. This is a
+            // PackageManager round-trip, so it is skipped once a value has been persisted.
+            setWhiteListPackages = querySystemLauncherPackages();
+        }
 
         // init key words
         String json = mPreference.getString(KEY_WORDS_LIST, "[\"跳过\"]");
+        List<String> stored = null;
         if(json != null) {
-            Type type = new TypeToken<ArrayList<String>>() {}.getType();
-            listKeyWords = mJson.fromJson(json, type);
-        } else {
-            listKeyWords = new ArrayList<>();
+            try {
+                Type type = new TypeToken<ArrayList<String>>() {}.getType();
+                stored = mJson.fromJson(json, type);
+            } catch (JsonSyntaxException e) {
+                Log.d(TAG, Utilities.getTraceStackInString(e));
+            }
         }
+        listKeyWords = stored == null ? Collections.singletonList("跳过") : SkipAdRules.parseKeywords(String.join(" ", stored));
 
         // load activity widgets
         json = mPreference.getString(PACKAGE_WIDGETS, null);
@@ -93,6 +93,19 @@ public class Settings {
             mapPackagePositions = new TreeMap<>();
         }
 
+    }
+
+    private static Set<String> querySystemLauncherPackages() {
+        Set<String> pkgSystems = new HashSet<>();
+        PackageManager packageManager = TouchHelperApp.getAppContext().getPackageManager();
+        Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
+        for (ResolveInfo e : ResolveInfoList) {
+            if ((e.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == ApplicationInfo.FLAG_SYSTEM) {
+                pkgSystems.add(e.activityInfo.packageName);
+            }
+        }
+        return pkgSystems;
     }
 
     // notification on skip ads?
@@ -141,14 +154,15 @@ public class Settings {
 
     // list of key words
     private static final String KEY_WORDS_LIST = "KEY_WORDS_LIST";
-    private ArrayList<String> listKeyWords;
+    // Never mutated in place: the accessibility service iterates this list on its worker
+    // thread, so every change installs a fresh immutable list instead.
+    private volatile List<String> listKeyWords;
     public List<String> getKeyWordList() { return listKeyWords; }
     public String getKeyWordsAsString() { return String.join(" ", listKeyWords); }
     public void setKeyWordList(String text) {
-        String keys[] = text.split(" ");
-        listKeyWords.clear();
-        listKeyWords.addAll(Arrays.asList(keys));
-        String json = mJson.toJson(listKeyWords);
+        List<String> keys = SkipAdRules.parseKeywords(text);
+        listKeyWords = Collections.unmodifiableList(keys);
+        String json = mJson.toJson(keys);
         mEditor.putString(KEY_WORDS_LIST, json);
         mEditor.apply();
     }
