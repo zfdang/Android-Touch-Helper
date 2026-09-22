@@ -1,9 +1,7 @@
 package com.zfdang.touchhelper.ui.home;
 
-import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -11,27 +9,20 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.text.method.Touch;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.TextView;
-import android.widget.Toast;
 
-import androidx.annotation.LongDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
-import androidx.core.content.res.ResourcesCompat;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
-import androidx.lifecycle.ViewModelProviders;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.zfdang.touchhelper.R;
 import com.zfdang.touchhelper.TouchHelperService;
@@ -44,8 +35,7 @@ public class HomeFragment extends Fragment {
 
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
-        homeViewModel =
-                ViewModelProviders.of(this).get(HomeViewModel.class);
+        homeViewModel = new ViewModelProvider(this).get(HomeViewModel.class);
         View root = inflater.inflate(R.layout.fragment_home, container, false);
 
         final Drawable drawableYes = ContextCompat.getDrawable(getContext(), R.drawable.ic_right);
@@ -79,14 +69,7 @@ public class HomeFragment extends Fragment {
 
         // set listener for buttons
         final ImageButton btAccessibilityPermission = root.findViewById(R.id.button_accessibility_permission);
-        btAccessibilityPermission.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent_abs = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
-                intent_abs.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent_abs);
-            }
-        });
+        btAccessibilityPermission.setOnClickListener(v -> showAccessibilityDisclosure());
 
         final ImageButton btPowerPermission = root.findViewById(R.id.button_power_permission);
         btPowerPermission.setOnClickListener(new View.OnClickListener() {
@@ -118,14 +101,31 @@ public class HomeFragment extends Fragment {
         super.onResume();
     }
 
+    /**
+     * Google Play requires a prominent in-app disclosure before an app sends the user to enable
+     * an accessibility service that is not an assistive tool: what the service reads, what it
+     * does with it, and that nothing leaves the device.
+     */
+    private void showAccessibilityDisclosure() {
+        if (TouchHelperService.isServiceRunning()) {
+            openAccessibilitySettings();
+            return;
+        }
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.accessibility_disclosure_title)
+                .setMessage(R.string.accessibility_disclosure_message)
+                .setPositiveButton(R.string.accessibility_disclosure_agree, (dialog, which) -> openAccessibilitySettings())
+                .setNegativeButton(R.string.accessibility_disclosure_cancel, null)
+                .show();
+    }
+
+    private void openAccessibilitySettings() {
+        Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+    }
+
     public void checkServiceStatus(){
-
-        // detect the app storage permission
-        boolean bAppPermission =
-                ContextCompat.checkSelfPermission(getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
-        MutableLiveData<Boolean> liveData = homeViewModel.getAppPermission();
-        liveData.setValue(bAppPermission);
-
         // detect the accessibility permission
         MutableLiveData<Boolean> accessibility = homeViewModel.getAccessibilityPermission();
         accessibility.setValue(TouchHelperService.isServiceRunning());

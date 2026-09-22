@@ -5,6 +5,7 @@
     android:accessibilityFlags="flagRetrieveInteractiveWindows|flagReportViewIds|flagIncludeNotImportantViews"
     android:canPerformGestures="true"
     android:canRetrieveWindowContent="true"
+    android:isAccessibilityTool="false"
     android:description="@string/touch_helper_service_description"
     android:notificationTimeout="50"
     android:settingsActivity="com.zfdang.touchhelper.MainActivity" />
