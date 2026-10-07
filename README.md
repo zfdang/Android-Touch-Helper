@@ -35,19 +35,9 @@ Ideas and pull requests are welcome.
 
 [![Star History Chart](https://api.star-history.com/svg?repos=zfdang/android-touch-helper&type=Date)](https://www.star-history.com/#zfdang/android-touch-helper)
 
-# Maintenance Note
+## Maintenance Note
 
-This started as a personal project several years ago, and I no longer have much time to actively improve or maintain it. New feature requests may be difficult to support.
-
-If you would like to contribute a PR, I will still do my best to review and merge it.
-
-```
-Recommended open-source alternative:
-https://github.com/gkd-kit/gkd
-
-There are also many ready-made rule sets:
-https://github.com/topics/gkd-subscription
-```
+This is a mature, stable project — the core functionality is complete and the app is widely used. I continue to maintain it: reviewing and merging PRs, cutting releases, and fixing bugs (most recent commits September 2026). Large new features may take longer, but the project is alive and maintained.
 
 # Acknowledgements
 
@@ -55,7 +45,4 @@ This project borrowed ideas and code from AccessibilityTool. Many thanks:
 
 https://github.com/LGH1996/AccessibilityTool
 
-# Sponsorship
-
-This project is supported by [ZMTO](https://zmto.com/) through its free VPS program for open-source projects. Thanks to ZMTO for supporting the open-source community.
 
