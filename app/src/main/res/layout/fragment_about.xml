@@ -66,6 +66,19 @@
         app:layout_constraintTop_toBottomOf="@+id/textView_app_introduction" />
 
     <TextView
+        android:id="@+id/textView_privacy_policy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:autoLink="web"
+        android:linksClickable="true"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="@string/about_privacy_policy"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@id/textView_weblink" />
+
+    <TextView
         android:id="@+id/textView_copyright"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
