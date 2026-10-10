@@ -58,13 +58,19 @@ jobs:
       run: |
         zip -r ./TouchHelper.zip ./release
 
-    - name: Get git revision
+    - name: Get release version
       id: get_git_revision
       run: |
-        echo "tag_name=$(($(git rev-list HEAD --count) + 100))" >> $GITHUB_OUTPUT
-        echo "release_name=$(($(git rev-list HEAD --count) + 100))" >> $GITHUB_OUTPUT
+        python3 - <<'PY'
+        import json, os
+        with open('app/build/outputs/apk/release/output-metadata.json') as metadata:
+            version = json.load(metadata)['elements'][0]['versionCode']
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+            output.write(f'tag_name={version}\nrelease_name={version}\n')
+        PY
 
     - name: Create Release and Upload APK
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v3
       env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

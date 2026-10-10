@@ -1,14 +1,12 @@
 apply plugin: 'com.android.application'
 
-// http://www.race604.com/android-auto-version/
-// use git count as build number, as current date as build version
+// Keep release codes explicit: squash merges can reduce the Git commit count and
+// produce a versionCode lower than an APK that has already been distributed.
 def getDate() {
     def date = new Date()
     def formattedDate = date.format('yyyy.MM.dd')
     return formattedDate
 }
-def cmd = 'git rev-list HEAD --count'
-def gitVersion = cmd.execute().text.trim().toInteger() + 100
 def appVersion = getDate()
 
 
@@ -24,7 +22,7 @@ android {
         applicationId "com.zfdang.touchhelper"
         minSdkVersion 26
         targetSdkVersion 36
-        versionCode gitVersion
+        versionCode 278
         versionName appVersion
 
         // Enabling multidex support.
