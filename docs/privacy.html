@@ -108,11 +108,12 @@
     <!-- English Content -->
     <div class="content-en active" id="content-en">
         <h1>Privacy Policy</h1>
-        <p class="date">Last updated: January 4, 2026</p>
+        <p class="date">Last updated: October 11, 2026</p>
 
         <div class="highlight">
-            <strong>Summary:</strong> Touch Helper is an open-source application that does NOT collect, store, or
-            transmit any personal data. Your privacy is fully protected.
+            <strong>Summary:</strong> Touch Helper processes screen controls on your device to skip splash ads.
+            It has no network permission and does not collect or share data off-device. Rules you explicitly
+            create are saved locally; copying or exporting controls and rules is performed only at your request.
         </div>
 
         <h2>Introduction</h2>
@@ -135,14 +136,21 @@
             screen advertisements. This service:</p>
         <ul>
             <li>Only monitors screen content to identify skip buttons</li>
-            <li>Does NOT record or store any screen content</li>
+            <li>Automatically detected controls are compared in memory and are not saved</li>
+            <li>Custom rules save the selected app, control text, description and coordinates locally</li>
+            <li>The copy-window-controls and export-rules actions place the information you request on the system clipboard</li>
             <li>Does NOT transmit any data externally</li>
             <li>Operates entirely on your device</li>
         </ul>
+        <p>The service reads interface control text, descriptions and positions, rather than taking screenshots.
+            Before it can read any interface content, the App displays a disclosure and requires your agreement.
+            You can disable the service in Android Accessibility settings at any time.</p>
 
         <h2>Data Storage</h2>
-        <p>All app settings and configurations are stored locally on your device. No data is ever uploaded to external
-            servers.</p>
+        <p>Settings, your disclosure choice and custom skip rules are stored in the App's local data. You can delete
+            rules in settings or clear all local data through Android's app settings. Android may back up app settings
+            according to your system backup preferences; the App does not operate a server or upload data itself.
+            When you copy controls or export rules, other apps you paste into may receive that information.</p>
 
         <h2>Third-Party Services</h2>
         <p>The App does not integrate any third-party services, SDKs, or analytics tools.</p>
@@ -166,10 +174,10 @@
     <!-- Chinese Content -->
     <div class="content-zh" id="content-zh">
         <h1>隐私政策</h1>
-        <p class="date">最后更新：2026年1月4日</p>
+        <p class="date">最后更新：2026年10月11日</p>
 
         <div class="highlight">
-            <strong>概要：</strong>开屏跳过是一款开源应用程序，不会收集、存储或传输任何个人数据。您的隐私受到完全保护。
+            <strong>概要：</strong>开屏跳过在设备本地处理界面控件，以跳过开屏广告。应用没有网络权限，不会在设备之外收集或分享数据。您主动创建的规则保存在本机；复制控件或导出规则仅按您的操作执行。
         </div>
 
         <h2>简介</h2>
@@ -190,13 +198,16 @@
         <p>本应用使用 Android 的无障碍服务来检测并自动点击开屏广告上的"跳过"按钮。此服务：</p>
         <ul>
             <li>仅监控屏幕内容以识别跳过按钮</li>
-            <li>不会记录或存储任何屏幕内容</li>
+            <li>自动检测的控件仅在内存中即时比对，不保存</li>
+            <li>自定义规则会将所选应用、控件文字、描述和坐标保存在本机</li>
+            <li>复制窗口控件和导出规则功能会将您要求复制的信息放入系统剪贴板</li>
             <li>不会向外部传输任何数据</li>
             <li>完全在您的设备上本地运行</li>
         </ul>
 
         <h2>数据存储</h2>
-        <p>所有应用设置和配置都存储在您设备的本地。不会有任何数据上传到外部服务器。</p>
+        <p>服务读取界面控件的文字、描述和位置，不截取屏幕图片。读取界面内容前，应用会显示说明并要求您明确同意。您可以随时在安卓无障碍设置中关闭服务。</p>
+        <p>设置、同意记录和自定义跳过规则保存在应用的本地数据中。您可以在设置中删除规则，或在安卓应用设置中清除全部本地数据。安卓系统可能根据您的系统备份设置备份应用配置；应用本身不运营服务器，也不主动上传数据。复制控件或导出规则后，您粘贴信息的其他应用可能获得这些信息。</p>
 
         <h2>第三方服务</h2>
         <p>本应用不集成任何第三方服务、SDK 或分析工具。</p>
