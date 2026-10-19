@@ -76,3 +76,5 @@ lint/tmp/
 
 .vscode/
 .omc/
+.DS_Store
+scripts/output/

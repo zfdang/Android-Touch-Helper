@@ -1085,4 +1085,72 @@ public class TouchHelperServiceImplTest {
         assertFalse("traversal leaked AccessibilityNodeInfo instances",
                 ShadowAccessibilityNodeInfo.areThereUnrecycledNodes(true));
     }
+
+    @Test
+    public void contentChanged_bubblesUpToClickableAncestor_whenChildTextNodeIsNotClickable() throws Exception {
+        startSkipAdProcess();
+        AtomicInteger containerClicks = new AtomicInteger();
+        AccessibilityNodeInfo root = node("android.widget.FrameLayout", null, null, new Rect(0, 0, 1080, 1920), null);
+        // Container button with click listener
+        AccessibilityNodeInfo container = node("android.widget.LinearLayout", null, "com.example.ad:id/skip_btn",
+                new Rect(800, 100, 1000, 180), containerClicks);
+        container.setClickable(true);
+
+        // Child TextView inside container has "跳过", but is not clickable
+        AccessibilityNodeInfo textNode = node("android.widget.TextView", "跳过", null,
+                new Rect(810, 110, 990, 170), null);
+        textNode.setClickable(false);
+        shadowOf(textNode).setOnPerformActionListener((action, args) -> false);
+
+        shadowOf(container).addChild(textNode);
+        shadowOf(root).addChild(container);
+
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, root));
+        awaitExecutor();
+        assertEquals(1, containerClicks.get());
+    }
+
+    @Test
+    public void contentChanged_matchesCompositeSplitKeywordInContainer() throws Exception {
+        startSkipAdProcess();
+        AtomicInteger containerClicks = new AtomicInteger();
+        AccessibilityNodeInfo root = node("android.widget.FrameLayout", null, null, new Rect(0, 0, 1080, 1920), null);
+        // Container button containing split text: child 0 "跳", child 1 "过"
+        AccessibilityNodeInfo container = node("android.widget.LinearLayout", null, "com.example.ad:id/skip_box",
+                new Rect(800, 100, 1000, 180), containerClicks);
+        container.setClickable(true);
+
+        AccessibilityNodeInfo part1 = node("android.widget.TextView", "跳", null,
+                new Rect(800, 100, 890, 180), null);
+        AccessibilityNodeInfo part2 = node("android.widget.TextView", "过", null,
+                new Rect(900, 100, 990, 180), null);
+
+        shadowOf(container).addChild(part1);
+        shadowOf(container).addChild(part2);
+        shadowOf(root).addChild(container);
+
+        impl.onAccessibilityEvent(contentChanged(AD_PKG, root));
+        awaitExecutor();
+        assertEquals(1, containerClicks.get());
+    }
+
+    @Test
+    public void traversal_recyclesCompositeNodesProperly() throws Exception {
+        startSkipAdProcess();
+        AtomicInteger containerClicks = new AtomicInteger();
+        AccessibilityNodeInfo root = node("android.widget.FrameLayout", null, null, new Rect(0, 0, 1080, 1920), null);
+        AccessibilityNodeInfo container = node("android.widget.LinearLayout", null, null,
+                new Rect(800, 100, 1000, 180), containerClicks);
+        container.setClickable(true);
+        shadowOf(container).addChild(node("android.widget.TextView", "跳", null, new Rect(800, 100, 890, 180), null));
+        shadowOf(container).addChild(node("android.widget.TextView", "过", null, new Rect(900, 100, 990, 180), null));
+        shadowOf(root).addChild(container);
+
+        ShadowAccessibilityNodeInfo.resetObtainedInstances();
+        impl.iterateNodesToSkipAd(AccessibilityNodeInfo.obtain(root), null, true);
+        assertEquals(1, containerClicks.get());
+        assertFalse("composite traversal leaked AccessibilityNodeInfo instances",
+                ShadowAccessibilityNodeInfo.areThereUnrecycledNodes(true));
+    }
 }
+
