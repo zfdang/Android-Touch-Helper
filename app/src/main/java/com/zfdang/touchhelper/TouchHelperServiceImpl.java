@@ -239,6 +239,7 @@ public class TouchHelperServiceImpl {
 
     public void onInterrupt(){
         dismissActivityCustomizationDialog();
+        stopSkipAdProcess();
     }
 
     /**
@@ -1581,7 +1582,9 @@ public class TouchHelperServiceImpl {
                     clipboard.setPrimaryClip(clip);
                 }
 
-                ShowToastInIntentService("窗口控件已复制到剪贴板！");
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+                    ShowToastInIntentService("窗口控件已复制到剪贴板！");
+                }
             }
         });
         btQuit.setOnClickListener(v -> dismissActivityCustomizationDialog());
@@ -1598,26 +1601,27 @@ public class TouchHelperServiceImpl {
         if (!isShow) {
             return;
         }
-        try {
-            final WindowManager windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
-            if (windowManager != null) {
-                if (overlayViewTarget != null) {
-                    windowManager.removeViewImmediate(overlayViewTarget);
+        final WindowManager windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
+        if (windowManager != null) {
+            removeOverlayView(windowManager, overlayViewTarget);
+            removeOverlayView(windowManager, overlayViewCustomization);
+            removeOverlayView(windowManager, overlayImageTarget);
+        }
+        overlayViewTarget = null;
+        overlayViewCustomization = null;
+        overlayImageTarget = null;
+        isShow = false;
+    }
+
+    private void removeOverlayView(WindowManager wm, View view) {
+        if (view != null) {
+            try {
+                if (view.isAttachedToWindow()) {
+                    wm.removeViewImmediate(view);
                 }
-                if (overlayViewCustomization != null) {
-                    windowManager.removeViewImmediate(overlayViewCustomization);
-                }
-                if (overlayImageTarget != null) {
-                    windowManager.removeViewImmediate(overlayImageTarget);
-                }
+            } catch (Throwable e) {
+                Log.w(TAG, "Failed to remove overlay view: " + e.getMessage());
             }
-        } catch (Throwable e) {
-            Log.e(TAG, Utilities.getTraceStackInString(e));
-        } finally {
-            overlayViewTarget = null;
-            overlayViewCustomization = null;
-            overlayImageTarget = null;
-            isShow = false;
         }
     }
 
