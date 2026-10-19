@@ -1,6 +1,8 @@
 package com.zfdang.touchhelper;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -150,5 +152,32 @@ public class SkipAdRulesTest {
         assertNull(SkipAdRules.findWidget(1, 2, 3, 4, "id", "desc", "跳过", null));
         assertNull(SkipAdRules.findWidget(1, 2, 3, 4, "id", "desc", "跳过", Collections.<PackageWidgetDescription>emptySet()));
         assertNull(SkipAdRules.findWidget(1, 2, 3, 4, "id", "desc", "跳过", Collections.<PackageWidgetDescription>singleton(null)));
+    }
+
+    // ---------------------------------------------------------------- PackageWidgetDescription equals / hashCode
+
+    @Test
+    public void widgetDescription_equalsAndHashCode_safeWithNullPosition() {
+        PackageWidgetDescription a = new PackageWidgetDescription();
+        a.position = null;
+        PackageWidgetDescription b = new PackageWidgetDescription();
+        b.position = null;
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+
+        b.position = new Rect(0, 0, 10, 10);
+        assertNotEquals(a, b);
+    }
+
+    @Test
+    public void widgetDescription_equalsDifferentiatesByIdAndTextEvenIfPositionMatches() {
+        PackageWidgetDescription a = rule(0, 0, 100, 50, "com.app:id/skip", "", "跳过");
+        PackageWidgetDescription b = rule(0, 0, 100, 50, "com.app:id/close", "", "关闭");
+        assertNotEquals(a, b);
+        assertNotEquals(a.hashCode(), b.hashCode());
+
+        PackageWidgetDescription copy = new PackageWidgetDescription(a);
+        assertEquals(a, copy);
+        assertEquals(a.hashCode(), copy.hashCode());
     }
 }
