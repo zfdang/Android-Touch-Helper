@@ -102,7 +102,8 @@ public class Settings {
         Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
         for (ResolveInfo e : ResolveInfoList) {
-            if ((e.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == ApplicationInfo.FLAG_SYSTEM) {
+            if (e.activityInfo != null && e.activityInfo.applicationInfo != null
+                    && (e.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == ApplicationInfo.FLAG_SYSTEM) {
                 pkgSystems.add(e.activityInfo.packageName);
             }
         }
@@ -156,13 +157,12 @@ public class Settings {
 
     // whitelist of packages
     private static final String WHITELIST_PACKAGE = "WHITELIST_PACKAGE";
-    private Set<String> setWhiteListPackages;
-    public Set<String> getWhitelistPackages() {
-        return setWhiteListPackages;
+    private volatile Set<String> setWhiteListPackages;
+    public synchronized Set<String> getWhitelistPackages() {
+        return new HashSet<>(setWhiteListPackages);
     }
-    public void setWhitelistPackages(Set<String> pkgs) {
-        setWhiteListPackages.clear();
-        setWhiteListPackages.addAll(pkgs);
+    public synchronized void setWhitelistPackages(Set<String> pkgs) {
+        setWhiteListPackages = new HashSet<>(pkgs);
         // https://stackoverflow.com/questions/10720028/android-sharedpreferences-not-saving
         mEditor.putStringSet(WHITELIST_PACKAGE, new HashSet<String>(setWhiteListPackages));
         mEditor.apply();
@@ -185,7 +185,7 @@ public class Settings {
 
     // map of key activity widgets
     private static final String PACKAGE_WIDGETS = "PACKAGE_WIDGETS";
-    private Map<String, Set<PackageWidgetDescription>> mapPackageWidgets;
+    private volatile Map<String, Set<PackageWidgetDescription>> mapPackageWidgets;
     public Map<String, Set<PackageWidgetDescription>> getPackageWidgets() { return mapPackageWidgets; }
     public void setPackageWidgets(Map<String, Set<PackageWidgetDescription>> map) {
         mapPackageWidgets = map;
@@ -217,7 +217,7 @@ public class Settings {
 
     // map of key package positions
     private static final String PACKAGE_POSITIONS = "PACKAGE_POSITIONS";
-    private Map<String, PackagePositionDescription> mapPackagePositions;
+    private volatile Map<String, PackagePositionDescription> mapPackagePositions;
     public Map<String, PackagePositionDescription> getPackagePositions() { return mapPackagePositions; }
     public void setPackagePositions(Map<String, PackagePositionDescription> map) {
         mapPackagePositions = map;
