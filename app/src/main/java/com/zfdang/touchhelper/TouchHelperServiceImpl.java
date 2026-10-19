@@ -89,6 +89,7 @@ public class TouchHelperServiceImpl {
     // the session they started under and only ever write to that one, so a click that completes
     // after the user re-entered the app cannot leak into the new process. See clickNode().
     private volatile ClickSession session = new ClickSession();
+    private volatile Future<?> positionClickFuture;
 
     private static final class ClickSession {
         /** widgets clicked in this process, keyed by clickKey() */
@@ -454,15 +455,17 @@ public class TouchHelperServiceImpl {
                         if (packagePositionDescription != null) {
                             ShowToastInIntentService("正在根据位置跳过广告...");
 
-                            // try to click the position in the activity for multiple times
-                            final Future<?>[] futures = {null};
-                            futures[0] = taskExecutorService.scheduleWithFixedDelay(new Runnable() {
+                            if (positionClickFuture != null) {
+                                positionClickFuture.cancel(true);
+                            }
+                            positionClickFuture = taskExecutorService.scheduleWithFixedDelay(new Runnable() {
                                 int num = 0;
                                 @Override
                                 public void run() {
                                     if (num < PACKAGE_POSITION_CLICK_RETRY && skipAdRunning) {
-                                        if(currentActivityName.equals(packagePositionDescription.activityName)) {
-                                            // current activity is null, or current activity is the target activity
+                                        if (packagePositionDescription.activityName == null
+                                                || packagePositionDescription.activityName.isEmpty()
+                                                || packagePositionDescription.activityName.equals(currentActivityName)) {
                                             if (BuildConfig.DEBUG) {
                                                 Log.d(TAG, "Find skip-ad by position, simulate click now! ");
                                             }
@@ -470,7 +473,9 @@ public class TouchHelperServiceImpl {
                                         }
                                         num ++;
                                     } else {
-                                        futures[0].cancel(true);
+                                        if (positionClickFuture != null) {
+                                            positionClickFuture.cancel(true);
+                                        }
                                     }
                                 }
                             }, PACKAGE_POSITION_CLICK_FIRST_DELAY, PACKAGE_POSITION_CLICK_RETRY_INTERVAL, TimeUnit.MILLISECONDS);
@@ -1207,6 +1212,10 @@ public class TouchHelperServiceImpl {
         skipAdByKeyword = false;
         setTargetedWidgets = null;
         clearPendingScans();
+        if (positionClickFuture != null) {
+            positionClickFuture.cancel(true);
+            positionClickFuture = null;
+        }
     }
 
     /**
