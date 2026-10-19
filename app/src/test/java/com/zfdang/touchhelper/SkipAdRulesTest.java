@@ -180,4 +180,31 @@ public class SkipAdRulesTest {
         assertEquals(a, copy);
         assertEquals(a.hashCode(), copy.hashCode());
     }
+
+    @Test
+    public void parseKeywords_handlesUnicodeAndFullWidthWhitespace() {
+        // \u3000 is Chinese full-width ideographic space
+        List<String> result = SkipAdRules.parseKeywords("\u3000跳过\u3000\u3000Skip \t关闭\u3000");
+        assertEquals(Arrays.asList("跳过", "Skip", "关闭"), result);
+    }
+
+    @Test
+    public void findKeyword_caseInsensitiveMatching() {
+        assertEquals("Skip", SkipAdRules.findKeyword("SKIP AD", null, KEYWORDS, SELF));
+        assertEquals("Skip", SkipAdRules.findKeyword("skip 5s", null, KEYWORDS, SELF));
+    }
+
+    @Test
+    public void findKeyword_stripsZeroWidthCharacters() {
+        // Ad inserting zero-width space (\u200B) or zero-width joiner (\u200D) to evade keyword detection
+        assertEquals("跳过", SkipAdRules.findKeyword("跳\u200B过\u200D广告", null, KEYWORDS, SELF));
+    }
+
+    @Test
+    public void findWidget_emptyPositionDoesNotMatchOffscreenZeroBounds() {
+        // Rule configured only by idName with position (0, 0, 0, 0)
+        PackageWidgetDescription rule = rule(0, 0, 0, 0, "com.app:id/skip", "", "");
+        // A node with bounds (0, 0, 0, 0) but different id must NOT match bounds
+        assertNull(SkipAdRules.findWidget(0, 0, 0, 0, "com.app:id/other", null, null, Collections.singleton(rule)));
+    }
 }
