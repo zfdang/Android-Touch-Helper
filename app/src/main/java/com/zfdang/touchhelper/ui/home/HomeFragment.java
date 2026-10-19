@@ -8,7 +8,6 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -21,7 +20,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -154,14 +152,9 @@ public class HomeFragment extends Fragment {
     }
 
     public void checkServiceStatus(){
-        // detect the accessibility permission
-        MutableLiveData<Boolean> accessibility = homeViewModel.getAccessibilityPermission();
-        accessibility.setValue(TouchHelperService.isServiceRunning());
-
-        // detect power optimization
-        PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
-        boolean hasIgnored = pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
-        MutableLiveData<Boolean> power = homeViewModel.getPowerOptimization();
-        power.setValue(hasIgnored);
+        Context context = getContext();
+        if (context != null) {
+            homeViewModel.refreshServiceStatus(context.getApplicationContext());
+        }
     }
 }

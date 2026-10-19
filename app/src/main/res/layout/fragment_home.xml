@@ -66,7 +66,7 @@
                     android:layout_marginTop="2dp"
                     android:layout_marginBottom="8dp"
                     android:src="@drawable/ic_configuration"
-                    android:text="@string/button_setting"
+                    android:contentDescription="@string/button_setting"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@id/text_accessibility_permission" />
 
@@ -75,6 +75,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:src="@drawable/ic_wrong"
+                    android:contentDescription="@string/text_accessibility_permission"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="@+id/guideline_accessibility_permission"
@@ -119,7 +120,7 @@
                     android:layout_marginTop="2dp"
                     android:layout_marginBottom="8dp"
                     android:src="@drawable/ic_configuration"
-                    android:text="@string/button_setting"
+                    android:contentDescription="@string/button_setting"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@id/text_power_permission" />
 
@@ -128,6 +129,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:src="@drawable/ic_wrong"
+                    android:contentDescription="@string/text_power_permission"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="@+id/guideline_power_permission"
