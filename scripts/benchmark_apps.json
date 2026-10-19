@@ -1,0 +1,69 @@
+[
+  {
+    "name": "工银e生活",
+    "pkg": "com.icbc.elife",
+    "category": "金融生活",
+    "expected_mode": "Ancestor Bubble Click / Direct Click"
+  },
+  {
+    "name": "建行生活",
+    "pkg": "com.ccb.longjiLife",
+    "category": "金融生活",
+    "expected_mode": "Direct Click"
+  },
+  {
+    "name": "中国电信",
+    "pkg": "com.ct.client",
+    "category": "通信服务",
+    "expected_mode": "Direct Click"
+  },
+  {
+    "name": "哔哩哔哩",
+    "pkg": "tv.danmaku.bili",
+    "category": "影音视频",
+    "expected_mode": "Direct Click"
+  },
+  {
+    "name": "菜鸟",
+    "pkg": "com.cainiao.wireless",
+    "category": "电商快递",
+    "expected_mode": "Direct Click"
+  },
+  {
+    "name": "知乎",
+    "pkg": "com.zhihu.android",
+    "category": "社交问答",
+    "expected_mode": "Direct Click"
+  },
+  {
+    "name": "拼多多",
+    "pkg": "com.xunmeng.pinduoduo",
+    "category": "电商购物",
+    "expected_mode": "Direct Click"
+  },
+  {
+    "name": "航旅纵横",
+    "pkg": "com.umetrip.android.msky.app",
+    "category": "商旅出行",
+    "expected_mode": "Direct Click"
+  },
+  {
+    "name": "腾讯视频",
+    "pkg": "com.tencent.qqlive",
+    "category": "影音视频",
+    "expected_mode": "Direct Click"
+  },
+  {
+    "name": "新浪微博",
+    "pkg": "com.sina.weibo",
+    "category": "社交媒体",
+    "expected_mode": "Gesture Fallback"
+  },
+  {
+    "name": "携程旅行",
+    "ctrip.android.view": "ctrip.android.view",
+    "pkg": "ctrip.android.view",
+    "category": "商旅出行",
+    "expected_mode": "Gesture Fallback"
+  }
+]
