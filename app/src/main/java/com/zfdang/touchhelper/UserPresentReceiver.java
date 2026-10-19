@@ -11,6 +11,9 @@ public class UserPresentReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (intent == null) {
+            return;
+        }
         // an Intent broadcast, just dispatch message to TouchHelperService
         String action = intent.getAction();
         // USER_PRESENT: the keyguard is gone; SCREEN_ON: the screen was turned on (devices

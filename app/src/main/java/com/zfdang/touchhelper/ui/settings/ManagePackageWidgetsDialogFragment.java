@@ -1,5 +1,6 @@
 package com.zfdang.touchhelper.ui.settings;
 
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -102,10 +103,14 @@ public class ManagePackageWidgetsDialogFragment extends DialogFragment {
             btRules.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    String url = "http://touchhelper.zfdang.com/rules";
-                    Intent i = new Intent(Intent.ACTION_VIEW);
-                    i.setData(Uri.parse(url));
-                    startActivity(i);
+                    try {
+                        String url = "https://touchhelper.zfdang.com/rules";
+                        Intent i = new Intent(Intent.ACTION_VIEW);
+                        i.setData(Uri.parse(url));
+                        startActivity(i);
+                    } catch (ActivityNotFoundException e) {
+                        Utilities.toast("未找到可打开网页的应用！");
+                    }
                 }
             });
         }

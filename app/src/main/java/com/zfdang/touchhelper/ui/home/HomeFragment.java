@@ -1,5 +1,6 @@
 package com.zfdang.touchhelper.ui.home;
 
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
@@ -26,6 +27,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.zfdang.touchhelper.R;
 import com.zfdang.touchhelper.TouchHelperService;
+import com.zfdang.touchhelper.Utilities;
 
 public class HomeFragment extends Fragment {
 
@@ -75,16 +77,12 @@ public class HomeFragment extends Fragment {
         btPowerPermission.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                //  打开电池优化的界面，让用户设置
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    String packageName = getActivity().getPackageName();
-
-                    // open battery optimization setting page
-                    Intent intent = new Intent();
-                    PowerManager pm = (PowerManager) getActivity().getSystemService(Context.POWER_SERVICE);
-                    intent.setAction(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-//                    intent.setData(Uri.parse("package:" + packageName));
+                // 打开电池优化的界面，让用户设置
+                try {
+                    Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
                     startActivity(intent);
+                } catch (ActivityNotFoundException e) {
+                    Utilities.toast("未找到系统电池优化设置页面！");
                 }
             }
         });
@@ -146,9 +144,13 @@ public class HomeFragment extends Fragment {
     private AlertDialog disclosureDialog;
 
     private void openAccessibilitySettings() {
-        Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
+        try {
+            Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            Utilities.toast("未找到系统无障碍设置页面！");
+        }
     }
 
     public void checkServiceStatus(){

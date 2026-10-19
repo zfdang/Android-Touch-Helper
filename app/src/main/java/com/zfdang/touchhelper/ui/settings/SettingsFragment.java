@@ -1,9 +1,10 @@
 package com.zfdang.touchhelper.ui.settings;
 
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import androidx.appcompat.app.AlertDialog;
+import java.util.concurrent.Executors;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -156,24 +157,25 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         // select packages to be whitelisted
         Preference whitelist = findPreference("setting_whitelist");
         if(whitelist != null) {
-            whitelist.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-                @Override
-                public boolean onPreferenceClick(Preference preference) {
-                    // find all launcher packages. ResolveInfo already carries the ApplicationInfo,
-                    // so no extra PackageManager round-trip per app is needed. Icons are loaded
-                    // lazily by the adapter instead of decoding every icon up-front on the UI thread.
+            whitelist.setOnPreferenceClickListener(preference -> {
+                Context context = getContext();
+                if (context != null) {
+                    Toast.makeText(context, "正在加载应用列表...", Toast.LENGTH_SHORT).show();
+                }
+                Executors.newSingleThreadExecutor().execute(() -> {
                     Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-                    List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
-                    final ArrayList<AppInformation> listApp = new ArrayList<>(ResolveInfoList.size());
+                    List<ResolveInfo> resolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
+                    final ArrayList<AppInformation> listApp = new ArrayList<>(resolveInfoList.size());
                     Set<String> seen = new HashSet<>();
                     Set<String> pkgWhitelist = mSetting.getWhitelistPackages();
-                    for (ResolveInfo e : ResolveInfoList) {
+                    HanyuPinyinOutputFormat outputFormat = new HanyuPinyinOutputFormat();
+                    for (ResolveInfo e : resolveInfoList) {
                         ApplicationInfo info = e.activityInfo.applicationInfo;
                         String pkgName = e.activityInfo.packageName;
                         if (info == null || !seen.add(pkgName)) {
                             continue;
                         }
-                        AppInformation appInfo = new AppInformation(pkgName, packageManager.getApplicationLabel(info).toString(), info);
+                        AppInformation appInfo = new AppInformation(pkgName, packageManager.getApplicationLabel(info).toString(), info, outputFormat);
                         appInfo.isChecked = pkgWhitelist.contains(pkgName);
                         listApp.add(appInfo);
                     }
@@ -181,153 +183,13 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                     // sort apps
                     Collections.sort(listApp);
 
-                    // listApp adapter
-                    BaseAdapter baseAdapter = new BaseAdapter() {
-                        @Override
-                        public int getCount() {
-                            return listApp.size();
-                        }
-
-                        @Override
-                        public Object getItem(int position) {
-                            return listApp.get(position);
-                        }
-
-                        @Override
-                        public long getItemId(int position) {
-                            return position;
-                        }
-
-                        @Override
-                        public View getView(int position, View convertView, ViewGroup parent) {
-                            ViewHolder holder;
-                            if (convertView == null) {
-                                convertView = inflater.inflate(R.layout.layout_package_information, null);
-                                holder = new ViewHolder(convertView);
-                                convertView.setTag(holder);
-                            } else {
-                                holder = (ViewHolder) convertView.getTag();
-                            }
-                            AppInformation app = listApp.get(position);
-                            holder.textView.setText(app.applicationName);
-                            holder.imageView.setImageDrawable(app.getIcon(packageManager));
-                            holder.checkBox.setChecked(app.isChecked);
-                            return convertView;
-                        }
-                    };
-
-                    // inflate the dialog view
-                    View viewAppList = inflater.inflate(R.layout.layout_select_packages, null);
-                    ListView listView = viewAppList.findViewById(R.id.listView);
-                    listView.setAdapter(baseAdapter);
-                    listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                        @Override
-                        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                            CheckBox item = ((ViewHolder) view.getTag()).checkBox;
-                            AppInformation app = listApp.get(position);
-                            app.isChecked = !app.isChecked;
-                            item.setChecked(app.isChecked);
-                        }
+                    if (getActivity() == null) return;
+                    getActivity().runOnUiThread(() -> {
+                        if (!isAdded() || getContext() == null) return;
+                        showWhitelistDialog(listApp);
                     });
-
-
-                    final AlertDialog dialog = new AlertDialog.Builder(getContext())
-                            .setView(viewAppList)
-                            .create();
-
-                    Button btCancel = viewAppList.findViewById(R.id.button_cancel);
-                    if(btCancel != null) {
-                        btCancel.setOnClickListener(new View.OnClickListener() {
-                            @Override
-                            public void onClick(View view) {
-                                dialog.dismiss();
-                            }
-                        });
-                    }
-                    Button btConfirm = viewAppList.findViewById(R.id.button_confirm);
-                    if(btConfirm != null) {
-                        btConfirm.setOnClickListener(new View.OnClickListener() {
-                            @Override
-                            public void onClick(View view) {
-                                // save checked packages
-                                Set<String> pkgWhitelist = new HashSet<>();
-                                for(AppInformation app: listApp) {
-                                    if(app.isChecked) {
-                                        pkgWhitelist.add(app.packageName);
-                                    }
-                                }
-                                mSetting.setWhitelistPackages(pkgWhitelist);
-
-                                // notify accessibility to refresh packages
-                                TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_PACKAGE);
-
-                                dialog.dismiss();
-                            }
-                        });
-                    }
-
-                    // show the dialog
-                    dialog.show();
-                    return true;
-                } // public boolean onPreferenceClick(Preference preference) {
-
-                final HanyuPinyinOutputFormat outputFormat = new HanyuPinyinOutputFormat();
-                class AppInformation implements Comparable{
-                    String packageName;
-                    String applicationName;
-                    String applicationNamePinyin;
-                    final ApplicationInfo applicationInfo;
-                    Drawable applicationIcon;
-                    boolean isChecked;
-
-                    public AppInformation(String packageName, String applicationName, ApplicationInfo applicationInfo) {
-                        this.packageName = packageName;
-                        this.applicationName = applicationName;
-                        this.applicationInfo = applicationInfo;
-                        try {
-                            applicationNamePinyin = PinyinHelper.toHanYuPinyinString(this.applicationName, outputFormat, "", true);
-                        } catch (BadHanyuPinyinOutputFormatCombination badHanyuPinyinOutputFormatCombination) {
-                            applicationNamePinyin = applicationName;
-                            Log.e(TAG, Utilities.getTraceStackInString(badHanyuPinyinOutputFormatCombination));
-                        }
-                        this.isChecked = false;
-                    }
-
-                    /** Decodes the icon on first display and caches it for the lifetime of the dialog. */
-                    Drawable getIcon(PackageManager pm) {
-                        if (applicationIcon == null) {
-                            applicationIcon = pm.getApplicationIcon(applicationInfo);
-                        }
-                        return applicationIcon;
-                    }
-
-                    @Override
-                    public int compareTo(Object o) {
-                        AppInformation other = (AppInformation) o;
-
-                        if(this.isChecked && !other.isChecked) {
-                            return -1;
-                        } else if (!this.isChecked && other.isChecked) {
-                            return 1;
-                        } else {
-                            //
-                            return this.applicationNamePinyin.compareTo(other.applicationNamePinyin);
-                        }
-                    }
-                } // class AppInformation
-
-                class ViewHolder {
-                    TextView textView;
-                    ImageView imageView;
-                    CheckBox checkBox;
-
-                    public ViewHolder(View v) {
-                        textView = v.findViewById(R.id.name);
-                        imageView = v.findViewById(R.id.img);
-                        checkBox = v.findViewById(R.id.check);
-                    }
-                } // class ViewHolder {
-
+                });
+                return true;
             });
         }
 
@@ -444,5 +306,131 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
         mapActivityPositions = Settings.getInstance().getPackagePositions();
         updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
+    }
+
+    private void showWhitelistDialog(List<AppInformation> listApp) {
+        BaseAdapter baseAdapter = new BaseAdapter() {
+            @Override
+            public int getCount() {
+                return listApp.size();
+            }
+
+            @Override
+            public Object getItem(int position) {
+                return listApp.get(position);
+            }
+
+            @Override
+            public long getItemId(int position) {
+                return position;
+            }
+
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                ViewHolder holder;
+                if (convertView == null) {
+                    convertView = inflater.inflate(R.layout.layout_package_information, parent, false);
+                    holder = new ViewHolder(convertView);
+                    convertView.setTag(holder);
+                } else {
+                    holder = (ViewHolder) convertView.getTag();
+                }
+                AppInformation app = listApp.get(position);
+                holder.textView.setText(app.applicationName);
+                holder.imageView.setImageDrawable(app.getIcon(packageManager));
+                holder.checkBox.setChecked(app.isChecked);
+                return convertView;
+            }
+        };
+
+        View viewAppList = inflater.inflate(R.layout.layout_select_packages, null);
+        ListView listView = viewAppList.findViewById(R.id.listView);
+        listView.setAdapter(baseAdapter);
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            ViewHolder holder = (ViewHolder) view.getTag();
+            if (holder != null) {
+                AppInformation app = listApp.get(position);
+                app.isChecked = !app.isChecked;
+                holder.checkBox.setChecked(app.isChecked);
+            }
+        });
+
+        final AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setView(viewAppList)
+                .create();
+
+        Button btCancel = viewAppList.findViewById(R.id.button_cancel);
+        if (btCancel != null) {
+            btCancel.setOnClickListener(view -> dialog.dismiss());
+        }
+        Button btConfirm = viewAppList.findViewById(R.id.button_confirm);
+        if (btConfirm != null) {
+            btConfirm.setOnClickListener(view -> {
+                Set<String> pkgWhitelist = new HashSet<>();
+                for (AppInformation app : listApp) {
+                    if (app.isChecked) {
+                        pkgWhitelist.add(app.packageName);
+                    }
+                }
+                mSetting.setWhitelistPackages(pkgWhitelist);
+                TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_PACKAGE);
+                dialog.dismiss();
+            });
+        }
+
+        dialog.show();
+    }
+
+    static class AppInformation implements Comparable<AppInformation> {
+        String packageName;
+        String applicationName;
+        String applicationNamePinyin;
+        final ApplicationInfo applicationInfo;
+        Drawable applicationIcon;
+        boolean isChecked;
+
+        public AppInformation(String packageName, String applicationName, ApplicationInfo applicationInfo, HanyuPinyinOutputFormat outputFormat) {
+            this.packageName = packageName;
+            this.applicationName = applicationName;
+            this.applicationInfo = applicationInfo;
+            try {
+                applicationNamePinyin = PinyinHelper.toHanYuPinyinString(this.applicationName, outputFormat, "", true);
+            } catch (BadHanyuPinyinOutputFormatCombination badHanyuPinyinOutputFormatCombination) {
+                applicationNamePinyin = applicationName;
+                Log.e("SettingsFragment", Utilities.getTraceStackInString(badHanyuPinyinOutputFormatCombination));
+            }
+            this.isChecked = false;
+        }
+
+        Drawable getIcon(PackageManager pm) {
+            if (applicationIcon == null) {
+                applicationIcon = pm.getApplicationIcon(applicationInfo);
+            }
+            return applicationIcon;
+        }
+
+        @Override
+        public int compareTo(AppInformation other) {
+            if (other == null) return 1;
+            if (this.isChecked && !other.isChecked) {
+                return -1;
+            } else if (!this.isChecked && other.isChecked) {
+                return 1;
+            } else {
+                return this.applicationNamePinyin.compareTo(other.applicationNamePinyin);
+            }
+        }
+    }
+
+    static class ViewHolder {
+        TextView textView;
+        ImageView imageView;
+        CheckBox checkBox;
+
+        public ViewHolder(View v) {
+            textView = v.findViewById(R.id.name);
+            imageView = v.findViewById(R.id.img);
+            checkBox = v.findViewById(R.id.check);
+        }
     }
 }

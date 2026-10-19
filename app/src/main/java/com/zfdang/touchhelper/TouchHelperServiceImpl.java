@@ -155,6 +155,9 @@ public class TouchHelperServiceImpl {
     private static final int PACKAGE_POSITION_CLICK_RETRY_INTERVAL = 500;
     private static final int PACKAGE_POSITION_CLICK_RETRY = 6;
     private boolean isShow = false;
+    private View overlayViewTarget;
+    private View overlayViewCustomization;
+    private View overlayImageTarget;
 
     public TouchHelperServiceImpl(AccessibilityService service) {
         this.service = service;
@@ -232,7 +235,7 @@ public class TouchHelperServiceImpl {
     }
 
     public void onInterrupt(){
-        // stopSkipAdProcess();
+        dismissActivityCustomizationDialog();
     }
 
     /**
@@ -450,7 +453,7 @@ public class TouchHelperServiceImpl {
 
                             // try to click the position in the activity for multiple times
                             final Future<?>[] futures = {null};
-                            futures[0] = taskExecutorService.scheduleAtFixedRate(new Runnable() {
+                            futures[0] = taskExecutorService.scheduleWithFixedDelay(new Runnable() {
                                 int num = 0;
                                 @Override
                                 public void run() {
@@ -517,6 +520,7 @@ public class TouchHelperServiceImpl {
 
     public void onUnbind(Intent intent) {
         try {
+            dismissActivityCustomizationDialog();
             stopSkipAdProcessInner();
             if (receiverHandler != null) {
                 receiverHandler.removeCallbacksAndMessages(null);
@@ -1504,19 +1508,41 @@ public class TouchHelperServiceImpl {
                 ShowToastInIntentService("窗口控件已复制到剪贴板！");
             }
         });
-        btQuit.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                windowManager.removeViewImmediate(viewTarget);
-                windowManager.removeViewImmediate(viewCustomization);
-                windowManager.removeViewImmediate(imageTarget);
-                isShow = false;
-            }
-        });
+        btQuit.setOnClickListener(v -> dismissActivityCustomizationDialog());
+        overlayViewTarget = viewTarget;
+        overlayViewCustomization = viewCustomization;
+        overlayImageTarget = imageTarget;
         windowManager.addView(viewTarget, outlineParams);
         windowManager.addView(viewCustomization, customizationParams);
         windowManager.addView(imageTarget, targetParams);
         isShow = true;
+    }
+
+    public void dismissActivityCustomizationDialog() {
+        if (!isShow) {
+            return;
+        }
+        try {
+            final WindowManager windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
+            if (windowManager != null) {
+                if (overlayViewTarget != null) {
+                    windowManager.removeViewImmediate(overlayViewTarget);
+                }
+                if (overlayViewCustomization != null) {
+                    windowManager.removeViewImmediate(overlayViewCustomization);
+                }
+                if (overlayImageTarget != null) {
+                    windowManager.removeViewImmediate(overlayImageTarget);
+                }
+            }
+        } catch (Throwable e) {
+            Log.e(TAG, Utilities.getTraceStackInString(e));
+        } finally {
+            overlayViewTarget = null;
+            overlayViewCustomization = null;
+            overlayImageTarget = null;
+            isShow = false;
+        }
     }
 
     public void ShowToastInIntentService(final String sText) {

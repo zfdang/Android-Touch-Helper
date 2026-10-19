@@ -41,23 +41,49 @@ public class PackageWidgetDescription implements Serializable {
         this.idName = widgetDescription.idName;
         this.description = widgetDescription.description;
         this.text = widgetDescription.text;
-        this.position = new Rect(widgetDescription.position);
+        if (widgetDescription.position != null) {
+            this.position = new Rect();
+            this.position.left = widgetDescription.position.left;
+            this.position.top = widgetDescription.position.top;
+            this.position.right = widgetDescription.position.right;
+            this.position.bottom = widgetDescription.position.bottom;
+        } else {
+            this.position = null;
+        }
         this.clickable = widgetDescription.clickable;
         this.onlyClick = widgetDescription.onlyClick;
-
     }
 
     @Override
     public boolean equals(Object obj) {
-        if (obj == null) return false;
         if (this == obj) return true;
-        if (!(obj instanceof PackageWidgetDescription)) return false;
+        if (obj == null || getClass() != obj.getClass()) return false;
         PackageWidgetDescription widget = (PackageWidgetDescription) obj;
-        return position.equals(widget.position);
+        return clickable == widget.clickable
+                && onlyClick == widget.onlyClick
+                && Objects.equals(packageName, widget.packageName)
+                && Objects.equals(activityName, widget.activityName)
+                && Objects.equals(className, widget.className)
+                && Objects.equals(idName, widget.idName)
+                && Objects.equals(description, widget.description)
+                && Objects.equals(text, widget.text)
+                && rectEquals(position, widget.position);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(position);
+        return Objects.hash(packageName, activityName, className, idName, description, text,
+                rectHashCode(position), clickable, onlyClick);
+    }
+
+    private static boolean rectEquals(Rect a, Rect b) {
+        if (a == b) return true;
+        if (a == null || b == null) return false;
+        return a.left == b.left && a.top == b.top && a.right == b.right && a.bottom == b.bottom;
+    }
+
+    private static int rectHashCode(Rect r) {
+        if (r == null) return 0;
+        return Objects.hash(r.left, r.top, r.right, r.bottom);
     }
 }

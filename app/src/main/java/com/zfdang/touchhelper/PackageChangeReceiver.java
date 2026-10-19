@@ -11,10 +11,12 @@ public class PackageChangeReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (intent == null) {
+            return;
+        }
         // an Intent broadcast, just dispatch message to TouchHelperService
         String action = intent.getAction();
-//        Log.d(TAG, action);
-        if(action.equals(Intent.ACTION_PACKAGE_ADDED) || action.equals(Intent.ACTION_PACKAGE_REMOVED)) {
+        if (Intent.ACTION_PACKAGE_ADDED.equals(action) || Intent.ACTION_PACKAGE_REMOVED.equals(action)) {
             TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_PACKAGE);
         }
     }
