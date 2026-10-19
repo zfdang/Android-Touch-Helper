@@ -35,6 +35,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.content.ContextCompat;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -87,6 +89,7 @@ public class TouchHelperServiceImpl {
     // the session they started under and only ever write to that one, so a click that completes
     // after the user re-entered the app cannot leak into the new process. See clickNode().
     private volatile ClickSession session = new ClickSession();
+    private volatile Future<?> positionClickFuture;
 
     private static final class ClickSession {
         /** widgets clicked in this process, keyed by clickKey() */
@@ -236,6 +239,7 @@ public class TouchHelperServiceImpl {
 
     public void onInterrupt(){
         dismissActivityCustomizationDialog();
+        stopSkipAdProcess();
     }
 
     /**
@@ -270,12 +274,13 @@ public class TouchHelperServiceImpl {
         // without a lock screen. Both are protected system broadcasts.
         IntentFilter wakeup = new IntentFilter(Intent.ACTION_USER_PRESENT);
         wakeup.addAction(Intent.ACTION_SCREEN_ON);
-        service.registerReceiver(userPresentReceiver, wakeup);
+        ContextCompat.registerReceiver(service, userPresentReceiver, wakeup, ContextCompat.RECEIVER_EXPORTED);
         packageChangeReceiver = new PackageChangeReceiver();
         IntentFilter actions = new IntentFilter();
         actions.addAction(Intent.ACTION_PACKAGE_ADDED);
         actions.addAction(Intent.ACTION_PACKAGE_REMOVED);
-        service.registerReceiver(packageChangeReceiver, actions);
+        actions.addDataScheme("package");
+        ContextCompat.registerReceiver(service, packageChangeReceiver, actions, ContextCompat.RECEIVER_EXPORTED);
 
         // install handler to handle broadcast messages
         receiverHandler = new Handler(Looper.getMainLooper(), msg -> {
@@ -394,7 +399,7 @@ public class TouchHelperServiceImpl {
                             wakeupPending = false;
                             // stop current skip ad process if it exists
                             stopSkipAdProcess();
-                            if(setPackages.contains(pkgName)) {
+                            if(isTargetPackage(pkgName)) {
                                 // if the package is in our list, start skip ads process
                                 // this is the only place to start skip ad process
                                 startSkipAdProcess();
@@ -411,7 +416,7 @@ public class TouchHelperServiceImpl {
                         if (wakeupPending && !isScreenLockedOrOff()) {
                             // the covered app is back and the device is unlocked: warm start
                             wakeupPending = false;
-                            if (setPackages.contains(pkgName)) {
+                            if (isTargetPackage(pkgName)) {
                                 if (BuildConfig.DEBUG) {
                                     Log.d(TAG, "warm start of " + pkgName + " after the lock screen, start to skip ads");
                                 }
@@ -451,15 +456,17 @@ public class TouchHelperServiceImpl {
                         if (packagePositionDescription != null) {
                             ShowToastInIntentService("正在根据位置跳过广告...");
 
-                            // try to click the position in the activity for multiple times
-                            final Future<?>[] futures = {null};
-                            futures[0] = taskExecutorService.scheduleWithFixedDelay(new Runnable() {
+                            if (positionClickFuture != null) {
+                                positionClickFuture.cancel(true);
+                            }
+                            positionClickFuture = taskExecutorService.scheduleWithFixedDelay(new Runnable() {
                                 int num = 0;
                                 @Override
                                 public void run() {
                                     if (num < PACKAGE_POSITION_CLICK_RETRY && skipAdRunning) {
-                                        if(currentActivityName.equals(packagePositionDescription.activityName)) {
-                                            // current activity is null, or current activity is the target activity
+                                        if (packagePositionDescription.activityName == null
+                                                || packagePositionDescription.activityName.isEmpty()
+                                                || packagePositionDescription.activityName.equals(currentActivityName)) {
                                             if (BuildConfig.DEBUG) {
                                                 Log.d(TAG, "Find skip-ad by position, simulate click now! ");
                                             }
@@ -467,7 +474,9 @@ public class TouchHelperServiceImpl {
                                         }
                                         num ++;
                                     } else {
-                                        futures[0].cancel(true);
+                                        if (positionClickFuture != null) {
+                                            positionClickFuture.cancel(true);
+                                        }
                                     }
                                 }
                             }, PACKAGE_POSITION_CLICK_FIRST_DELAY, PACKAGE_POSITION_CLICK_RETRY_INTERVAL, TimeUnit.MILLISECONDS);
@@ -1056,20 +1065,27 @@ public class TouchHelperServiceImpl {
     }
 
     private String dumpRootNode(AccessibilityNodeInfo root) {
+        if (root == null) return "";
         ArrayList<AccessibilityNodeInfo> nodeList = new ArrayList<>();
         StringBuilder dumpString = new StringBuilder();
-        dumpChildNodes(root, nodeList, dumpString, "");
-        return dumpString.toString();
+        try {
+            dumpChildNodes(root, nodeList, dumpString, "");
+            return dumpString.toString();
+        } finally {
+            for (AccessibilityNodeInfo node : nodeList) {
+                recycleNode(node);
+            }
+        }
     }
 
     private void dumpChildNodes(AccessibilityNodeInfo root, List<AccessibilityNodeInfo> list, StringBuilder dumpString, String indent) {
         if(root == null) return;
         list.add(root);
-        dumpString.append(indent + Utilities.describeAccessibilityNode(root) + "\n");
+        dumpString.append(indent).append(Utilities.describeAccessibilityNode(root)).append("\n");
 
         for (int n = 0; n < root.getChildCount(); n++) {
             AccessibilityNodeInfo child = root.getChild(n);
-            dumpChildNodes(child, list, dumpString,indent + " ");
+            dumpChildNodes(child, list, dumpString, indent + " ");
         }
     }
 
@@ -1087,6 +1103,12 @@ public class TouchHelperServiceImpl {
     // apps that show a warm-start ad after the screen was unlocked do so within about a second
     private static final long WAKEUP_RESCAN_DELAY_MS = 1000;
 
+    private boolean isTargetPackage(String pkg) {
+        return pkg != null && (setPackages.contains(pkg)
+                || mapPackageWidgets.containsKey(pkg)
+                || mapPackagePositions.containsKey(pkg));
+    }
+
     /**
      * The screen was turned on or unlocked while an app was in the foreground. Many apps show a
      * splash ad on such a warm start, so restart the skip-ad process for that app and scan its
@@ -1095,8 +1117,12 @@ public class TouchHelperServiceImpl {
      * keyguard, IME).
      */
     private void resumeSkipAdAfterWakeup() {
+        if (!mSetting.isDisclosureAccepted()) {
+            remindDisclosureOnce();
+            return;
+        }
         final String pkg = currentPackageName;
-        if (pkg == null || !setPackages.contains(pkg)) {
+        if (pkg == null || !isTargetPackage(pkg)) {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "wakeup while in " + pkg + ", not a target package");
             }
@@ -1147,6 +1173,9 @@ public class TouchHelperServiceImpl {
      * start the skip-ad process
      */
     private void startSkipAdProcess() {
+        if (!mSetting.isDisclosureAccepted()) {
+            return;
+        }
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Start Skip-ad process");
         }
@@ -1184,6 +1213,10 @@ public class TouchHelperServiceImpl {
         skipAdByKeyword = false;
         setTargetedWidgets = null;
         clearPendingScans();
+        if (positionClickFuture != null) {
+            positionClickFuture.cancel(true);
+            positionClickFuture = null;
+        }
     }
 
     /**
@@ -1230,6 +1263,31 @@ public class TouchHelperServiceImpl {
         // publish the new sets atomically for the event thread
         this.setIMEApps = setIMEApps;
         this.setPackages = setPackages;
+    }
+
+    private static class NodeOutlineData {
+        final Rect bounds;
+        final boolean clickable;
+        final String className;
+        final String idName;
+        final String description;
+        final String text;
+        final int area;
+
+        NodeOutlineData(AccessibilityNodeInfo node) {
+            this.bounds = new Rect();
+            node.getBoundsInScreen(this.bounds);
+            this.clickable = node.isClickable();
+            CharSequence cls = node.getClassName();
+            this.className = cls == null ? "" : cls.toString();
+            CharSequence id = node.getViewIdResourceName();
+            this.idName = id == null ? "" : id.toString();
+            CharSequence desc = node.getContentDescription();
+            this.description = desc == null ? "" : desc.toString();
+            CharSequence txt = node.getText();
+            this.text = txt == null ? "" : txt.toString();
+            this.area = this.bounds.width() * this.bounds.height();
+        }
     }
 
     // display activity customization dialog, and allow users to pick widget or positions
@@ -1373,21 +1431,26 @@ public class TouchHelperServiceImpl {
                     layoutOverlayOutline.removeAllViews();
                     ArrayList<AccessibilityNodeInfo> roots = new ArrayList<>();
                     roots.add(root);
-                    ArrayList<AccessibilityNodeInfo> nodeList = new ArrayList<>();
-                    findAllNode(roots, nodeList, "");
-                    Collections.sort(nodeList, new Comparator<AccessibilityNodeInfo>() {
-                        @Override
-                        public int compare(AccessibilityNodeInfo a, AccessibilityNodeInfo b) {
-                            Rect rectA = new Rect();
-                            Rect rectB = new Rect();
-                            a.getBoundsInScreen(rectA);
-                            b.getBoundsInScreen(rectB);
-                            return rectB.width() * rectB.height() - rectA.width() * rectA.height();
+                    ArrayList<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+                    List<NodeOutlineData> outlineDataList = new ArrayList<>();
+                    try {
+                        findAllNode(roots, allNodes, "");
+                        for (AccessibilityNodeInfo e : allNodes) {
+                            if (e != null) {
+                                outlineDataList.add(new NodeOutlineData(e));
+                            }
                         }
-                    });
-                    for (final AccessibilityNodeInfo e : nodeList) {
-                        final Rect temRect = new Rect();
-                        e.getBoundsInScreen(temRect);
+                    } finally {
+                        for (AccessibilityNodeInfo node : allNodes) {
+                            recycleNode(node);
+                        }
+                    }
+
+                    // Sort by area descending without any Binder IPC
+                    outlineDataList.sort((a, b) -> Integer.compare(b.area, a.area));
+
+                    for (final NodeOutlineData data : outlineDataList) {
+                        final Rect temRect = data.bounds;
                         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(temRect.width(), temRect.height());
                         params.leftMargin = temRect.left;
                         params.topMargin = temRect.top;
@@ -1404,19 +1467,29 @@ public class TouchHelperServiceImpl {
                             @Override
                             public void onFocusChange(View v, boolean hasFocus) {
                                 if (hasFocus) {
-                                    widgetDescription.position = temRect;
-                                    widgetDescription.clickable = e.isClickable();
-                                    widgetDescription.className = e.getClassName().toString();
-                                    CharSequence cId = e.getViewIdResourceName();
-                                    widgetDescription.idName = cId == null ? "" : cId.toString();
-                                    CharSequence cDesc = e.getContentDescription();
-                                    widgetDescription.description = cDesc == null ? "" : cDesc.toString();
-                                    CharSequence cText = e.getText();
-                                    widgetDescription.text = cText == null ? "" : cText.toString();
+                                    widgetDescription.position = new Rect(temRect);
+                                    widgetDescription.clickable = data.clickable;
+                                    widgetDescription.className = data.className;
+                                    widgetDescription.idName = data.idName;
+                                    widgetDescription.description = data.description;
+                                    widgetDescription.text = data.text;
                                     btAddWidget.setEnabled(true);
                                     tvPackageName.setText(widgetDescription.packageName);
                                     tvActivityName.setText(widgetDescription.activityName);
-                                    tvWidgetInfo.setText("click:" + (e.isClickable() ? "true" : "false") + " " + "bonus:" + temRect.toShortString() + " " + "id:" + (cId == null ? "null" : cId.toString().substring(cId.toString().indexOf("id/") + 3)) + " " + "desc:" + (cDesc == null ? "null" : cDesc.toString()) + " " + "text:" + (cText == null ? "null" : cText.toString()));
+
+                                    String idDisplay;
+                                    int idIdx = data.idName.indexOf("id/");
+                                    if (idIdx >= 0) {
+                                        idDisplay = data.idName.substring(idIdx + 3);
+                                    } else {
+                                        idDisplay = data.idName.isEmpty() ? "null" : data.idName;
+                                    }
+
+                                    tvWidgetInfo.setText("click:" + (data.clickable ? "true" : "false")
+                                            + " bonus:" + temRect.toShortString()
+                                            + " id:" + idDisplay
+                                            + " desc:" + (data.description.isEmpty() ? "null" : data.description)
+                                            + " text:" + (data.text.isEmpty() ? "null" : data.text));
                                     v.setBackgroundResource(R.drawable.node_focus);
                                 } else {
                                     v.setBackgroundResource(R.drawable.node);
@@ -1499,13 +1572,19 @@ public class TouchHelperServiceImpl {
                 if (root == null) return;
                 String result = dumpRootNode(root);
 
-                Log.d(TAG, result);
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, result);
+                }
 
                 ClipboardManager clipboard = (ClipboardManager) service.getSystemService(Context.CLIPBOARD_SERVICE);
-                ClipData clip = ClipData.newPlainText("ACTIVITY", result);
-                clipboard.setPrimaryClip(clip);
+                if (clipboard != null) {
+                    ClipData clip = ClipData.newPlainText("ACTIVITY", result);
+                    clipboard.setPrimaryClip(clip);
+                }
 
-                ShowToastInIntentService("窗口控件已复制到剪贴板！");
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+                    ShowToastInIntentService("窗口控件已复制到剪贴板！");
+                }
             }
         });
         btQuit.setOnClickListener(v -> dismissActivityCustomizationDialog());
@@ -1522,26 +1601,27 @@ public class TouchHelperServiceImpl {
         if (!isShow) {
             return;
         }
-        try {
-            final WindowManager windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
-            if (windowManager != null) {
-                if (overlayViewTarget != null) {
-                    windowManager.removeViewImmediate(overlayViewTarget);
+        final WindowManager windowManager = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
+        if (windowManager != null) {
+            removeOverlayView(windowManager, overlayViewTarget);
+            removeOverlayView(windowManager, overlayViewCustomization);
+            removeOverlayView(windowManager, overlayImageTarget);
+        }
+        overlayViewTarget = null;
+        overlayViewCustomization = null;
+        overlayImageTarget = null;
+        isShow = false;
+    }
+
+    private void removeOverlayView(WindowManager wm, View view) {
+        if (view != null) {
+            try {
+                if (view.isAttachedToWindow()) {
+                    wm.removeViewImmediate(view);
                 }
-                if (overlayViewCustomization != null) {
-                    windowManager.removeViewImmediate(overlayViewCustomization);
-                }
-                if (overlayImageTarget != null) {
-                    windowManager.removeViewImmediate(overlayImageTarget);
-                }
+            } catch (Throwable e) {
+                Log.w(TAG, "Failed to remove overlay view: " + e.getMessage());
             }
-        } catch (Throwable e) {
-            Log.e(TAG, Utilities.getTraceStackInString(e));
-        } finally {
-            overlayViewTarget = null;
-            overlayViewCustomization = null;
-            overlayImageTarget = null;
-            isShow = false;
         }
     }
 

@@ -23,35 +23,47 @@ public class PackageWidgetDescription implements Serializable {
     }
 
     public PackageWidgetDescription(String packageName, String activityName, String className, String idName, String description, String text, Rect position, boolean clickable, boolean onlyClick) {
-        this.packageName = packageName;
-        this.activityName = activityName;
-        this.className = className;
-        this.idName = idName;
-        this.description = description;
-        this.text = text;
-        this.position = position;
+        this.packageName = packageName != null ? packageName : "";
+        this.activityName = activityName != null ? activityName : "";
+        this.className = className != null ? className : "";
+        this.idName = idName != null ? idName : "";
+        this.description = description != null ? description : "";
+        this.text = text != null ? text : "";
+        this.position = position != null ? new Rect(position) : null;
         this.clickable = clickable;
         this.onlyClick = onlyClick;
     }
 
     public PackageWidgetDescription(PackageWidgetDescription widgetDescription) {
-        this.packageName = widgetDescription.packageName;
-        this.activityName = widgetDescription.activityName;
-        this.className = widgetDescription.className;
-        this.idName = widgetDescription.idName;
-        this.description = widgetDescription.description;
-        this.text = widgetDescription.text;
-        if (widgetDescription.position != null) {
-            this.position = new Rect();
-            this.position.left = widgetDescription.position.left;
-            this.position.top = widgetDescription.position.top;
-            this.position.right = widgetDescription.position.right;
-            this.position.bottom = widgetDescription.position.bottom;
+        if (widgetDescription != null) {
+            this.packageName = widgetDescription.packageName != null ? widgetDescription.packageName : "";
+            this.activityName = widgetDescription.activityName != null ? widgetDescription.activityName : "";
+            this.className = widgetDescription.className != null ? widgetDescription.className : "";
+            this.idName = widgetDescription.idName != null ? widgetDescription.idName : "";
+            this.description = widgetDescription.description != null ? widgetDescription.description : "";
+            this.text = widgetDescription.text != null ? widgetDescription.text : "";
+            if (widgetDescription.position != null) {
+                this.position = new Rect();
+                this.position.left = widgetDescription.position.left;
+                this.position.top = widgetDescription.position.top;
+                this.position.right = widgetDescription.position.right;
+                this.position.bottom = widgetDescription.position.bottom;
+            } else {
+                this.position = null;
+            }
+            this.clickable = widgetDescription.clickable;
+            this.onlyClick = widgetDescription.onlyClick;
         } else {
+            this.packageName = "";
+            this.activityName = "";
+            this.className = "";
+            this.idName = "";
+            this.description = "";
+            this.text = "";
             this.position = null;
+            this.clickable = false;
+            this.onlyClick = false;
         }
-        this.clickable = widgetDescription.clickable;
-        this.onlyClick = widgetDescription.onlyClick;
     }
 
     @Override

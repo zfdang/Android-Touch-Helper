@@ -22,17 +22,23 @@ public final class SkipAdRules {
 
     /**
      * Splits the user-entered keyword string on whitespace and drops blank entries.
+     * Supports Unicode whitespace (e.g. full-width spaces).
      * A blank keyword would otherwise match every short label on screen.
      */
     public static List<String> parseKeywords(String text) {
         if (text == null) {
             return Collections.emptyList();
         }
-        String[] parts = text.trim().split("\\s+");
+        String stripped = text.replaceAll("^[\\s\\p{Z}]+|[\\s\\p{Z}]+$", "");
+        if (stripped.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String[] parts = stripped.split("(?U)\\s+");
         ArrayList<String> result = new ArrayList<>(parts.length);
         for (String part : parts) {
-            if (!part.isEmpty() && !result.contains(part)) {
-                result.add(part);
+            String clean = stripInvisibleChars(part).trim();
+            if (!clean.isEmpty() && !result.contains(clean)) {
+                result.add(clean);
             }
         }
         return result;
@@ -69,10 +75,42 @@ public final class SkipAdRules {
         return null;
     }
 
-    private static boolean matchesKeyword(String label, String keyword, String excludedText) {
-        return label.length() <= keyword.length() + KEYWORD_MAX_EXTRA_LENGTH
-                && label.contains(keyword)
-                && !label.equals(excludedText);
+    static boolean matchesKeyword(String label, String keyword, String excludedText) {
+        if (label == null || keyword == null) {
+            return false;
+        }
+        String cleanLabel = stripInvisibleChars(label);
+        String cleanKeyword = stripInvisibleChars(keyword);
+        if (cleanLabel.length() > cleanKeyword.length() + KEYWORD_MAX_EXTRA_LENGTH) {
+            return false;
+        }
+        if (!containsIgnoreCase(cleanLabel, cleanKeyword)) {
+            return false;
+        }
+        return excludedText == null || !cleanLabel.equalsIgnoreCase(excludedText);
+    }
+
+    static boolean containsIgnoreCase(String src, String what) {
+        if (src == null || what == null) {
+            return false;
+        }
+        final int length = what.length();
+        if (length == 0) {
+            return true;
+        }
+        for (int i = 0; i <= src.length() - length; i++) {
+            if (src.regionMatches(true, i, what, 0, length)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static String stripInvisibleChars(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replaceAll("[\u200B-\u200D\uFEFF]", "");
     }
 
     /**
@@ -110,6 +148,7 @@ public final class SkipAdRules {
 
     private static boolean boundsEqual(PackageWidgetDescription rule, int left, int top, int right, int bottom) {
         return rule.position != null
+                && (rule.position.left < rule.position.right && rule.position.top < rule.position.bottom)
                 && rule.position.left == left
                 && rule.position.top == top
                 && rule.position.right == right

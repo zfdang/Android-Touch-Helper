@@ -1,10 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#6200EE</color>
-    <color name="colorPrimaryDark">#3700B3</color>
-    <color name="colorAccent">#03DAC5</color>
+    <!-- Brand / Primary Colors -->
+    <color name="colorPrimary">#2563EB</color>
+    <color name="colorPrimaryDark">#1D4ED8</color>
+    <color name="colorPrimaryLight">#DBEAFE</color>
+    <color name="colorAccent">#2563EB</color>
 
-    <color name="divideLine">#25000000</color>
-    <color name="textColor">#ff000000</color>
+    <!-- Surface & Backgrounds -->
+    <color name="page_background">#F8FAFC</color>
+    <color name="card_surface">#FFFFFF</color>
+    <color name="card_stroke">#E2E8F0</color>
+    <color name="divideLine">#15000000</color>
 
+    <!-- Typography -->
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#475569</color>
+    <color name="text_tertiary">#94A3B8</color>
+    <color name="textColor">#0F172A</color>
+
+    <!-- Status: Running / Success (Green) -->
+    <color name="status_running_bg">#ECFDF5</color>
+    <color name="status_running_stroke">#A7F3D0</color>
+    <color name="status_running_text">#065F46</color>
+    <color name="status_running_badge_bg">#D1FAE5</color>
+    <color name="status_running_badge_text">#047857</color>
+    <color name="status_running_icon">#10B981</color>
+
+    <!-- Status: Stopped / Warning (Amber/Orange) -->
+    <color name="status_stopped_bg">#FFFBEB</color>
+    <color name="status_stopped_stroke">#FDE68A</color>
+    <color name="status_stopped_text">#92400E</color>
+    <color name="status_stopped_badge_bg">#FEF3C7</color>
+    <color name="status_stopped_badge_text">#B45309</color>
+    <color name="status_stopped_icon">#F59E0B</color>
+
+    <!-- Status: Info / Security Banner (Blue) -->
+    <color name="status_info_bg">#EFF6FF</color>
+    <color name="status_info_stroke">#BFDBFE</color>
+    <color name="status_info_text">#1E40AF</color>
+    <color name="status_info_icon">#3B82F6</color>
+
+    <!-- Action Badge (Primary Blue) -->
+    <color name="badge_action_bg">#EFF6FF</color>
+    <color name="badge_action_text">#2563EB</color>
+
+    <!-- Tag Badge Colors -->
+    <color name="tag_required_bg">#FEE2E2</color>
+    <color name="tag_required_text">#DC2626</color>
+    <color name="tag_recommended_bg">#FEF3C7</color>
+    <color name="tag_recommended_text">#D97706</color>
 </resources>

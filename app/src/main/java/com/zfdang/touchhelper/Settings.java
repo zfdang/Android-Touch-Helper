@@ -1,6 +1,7 @@
 package com.zfdang.touchhelper;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
@@ -23,25 +24,36 @@ import java.util.Set;
 import java.util.TreeMap;
 
 public class Settings {
-    private final String TAG = "Settings";
-    private final String Preference_Name = "TouchHelper_Config";
+    private static final String TAG = "Settings";
+    private static final String Preference_Name = "TouchHelper_Config";
 
     private SharedPreferences mPreference;
-    private SharedPreferences.Editor mEditor;
     private Gson mJson;
 
-    // Singleton
-    private static Settings ourInstance = new Settings();
+    // Singleton with thread-safe lazy initialization
+    private static volatile Settings ourInstance;
     public static Settings getInstance() {
+        if (ourInstance == null) {
+            synchronized (Settings.class) {
+                if (ourInstance == null) {
+                    ourInstance = new Settings();
+                }
+            }
+        }
         return ourInstance;
     }
+
     private Settings() {
         initSettings();
     }
 
     private void initSettings() {
-        mPreference = TouchHelperApp.getAppContext().getSharedPreferences(Preference_Name, Activity.MODE_PRIVATE);
-        mEditor = mPreference.edit();
+        Context context = TouchHelperApp.getAppContext();
+        if (context == null) {
+            Log.e(TAG, "TouchHelperApp context is not yet available during Settings initialization.");
+            return;
+        }
+        mPreference = context.getSharedPreferences(Preference_Name, Activity.MODE_PRIVATE);
         mJson = new Gson();
 
         // init all settings from SharedPreferences
@@ -52,14 +64,11 @@ public class Settings {
         iSkipAdDuration = mPreference.getInt(SKIP_AD_DURATION, 4);
 
         // init whitelist of packages
-        // https://stackoverflow.com/questions/10720028/android-sharedpreferences-not-saving
-        // Note that you must not modify the set instance returned by this call. The consistency of the stored data is not guaranteed if you do, nor is your ability to modify the instance at all.
         Set<String> storedWhitelist = mPreference.getStringSet(WHITELIST_PACKAGE, null);
         if (storedWhitelist != null) {
             setWhiteListPackages = new HashSet<>(storedWhitelist);
         } else {
-            // first run only: default the whitelist to all system packages. This is a
-            // PackageManager round-trip, so it is skipped once a value has been persisted.
+            // first run only: default the whitelist to all system packages.
             setWhiteListPackages = querySystemLauncherPackages();
         }
 
@@ -74,34 +83,58 @@ public class Settings {
                 Log.d(TAG, Utilities.getTraceStackInString(e));
             }
         }
-        listKeyWords = stored == null ? Collections.singletonList("跳过") : SkipAdRules.parseKeywords(String.join(" ", stored));
+        if (stored != null && !stored.isEmpty()) {
+            List<String> cleaned = new ArrayList<>();
+            for (String s : stored) {
+                if (s != null && !s.trim().isEmpty() && !cleaned.contains(s.trim())) {
+                    cleaned.add(s.trim());
+                }
+            }
+            listKeyWords = Collections.unmodifiableList(cleaned);
+        } else {
+            listKeyWords = Collections.singletonList("跳过");
+        }
 
-        // load activity widgets
+        // load activity widgets with JSON corruption protection
         json = mPreference.getString(PACKAGE_WIDGETS, null);
+        mapPackageWidgets = new TreeMap<>();
         if (json != null) {
-            Type type = new TypeToken<TreeMap<String, Set<PackageWidgetDescription>>>() {}.getType();
-            mapPackageWidgets = mJson.fromJson(json, type);
-        } else {
-            mapPackageWidgets = new TreeMap<>();
+            try {
+                Type type = new TypeToken<TreeMap<String, Set<PackageWidgetDescription>>>() {}.getType();
+                TreeMap<String, Set<PackageWidgetDescription>> parsed = mJson.fromJson(json, type);
+                if (parsed != null) {
+                    mapPackageWidgets = parsed;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Corrupted PACKAGE_WIDGETS in preferences: " + e.getMessage());
+            }
         }
 
-        // load activity positions
+        // load activity positions with JSON corruption protection
         json = mPreference.getString(PACKAGE_POSITIONS, null);
+        mapPackagePositions = new TreeMap<>();
         if (json != null) {
-            Type type = new TypeToken<TreeMap<String, PackagePositionDescription>>() {}.getType();
-            mapPackagePositions = mJson.fromJson(json, type);
-        } else {
-            mapPackagePositions = new TreeMap<>();
+            try {
+                Type type = new TypeToken<TreeMap<String, PackagePositionDescription>>() {}.getType();
+                TreeMap<String, PackagePositionDescription> parsed = mJson.fromJson(json, type);
+                if (parsed != null) {
+                    mapPackagePositions = parsed;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Corrupted PACKAGE_POSITIONS in preferences: " + e.getMessage());
+            }
         }
-
     }
 
     private static Set<String> querySystemLauncherPackages() {
         Set<String> pkgSystems = new HashSet<>();
-        PackageManager packageManager = TouchHelperApp.getAppContext().getPackageManager();
+        Context context = TouchHelperApp.getAppContext();
+        if (context == null) return pkgSystems;
+        PackageManager packageManager = context.getPackageManager();
+        if (packageManager == null) return pkgSystems;
         Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-        List<ResolveInfo> ResolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
-        for (ResolveInfo e : ResolveInfoList) {
+        List<ResolveInfo> resolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL);
+        for (ResolveInfo e : resolveInfoList) {
             if (e.activityInfo != null && e.activityInfo.applicationInfo != null
                     && (e.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == ApplicationInfo.FLAG_SYSTEM) {
                 pkgSystems.add(e.activityInfo.packageName);
@@ -111,9 +144,6 @@ public class Settings {
     }
 
     // has the user confirmed the in-app disclosure about what the accessibility service reads?
-    // Google Play requires this consent before the service may process screen content, so the
-    // service stays idle until it is recorded (also for users who enabled the service before
-    // the disclosure existed).
     private static final String ACCESSIBILITY_DISCLOSURE_ACCEPTED = "ACCESSIBILITY_DISCLOSURE_ACCEPTED";
     private volatile boolean bDisclosureAccepted;
     public boolean isDisclosureAccepted() {
@@ -121,39 +151,34 @@ public class Settings {
     }
     public void setDisclosureAccepted(boolean accepted) {
         bDisclosureAccepted = accepted;
-        mEditor.putBoolean(ACCESSIBILITY_DISCLOSURE_ACCEPTED, accepted);
-        mEditor.apply();
+        mPreference.edit().putBoolean(ACCESSIBILITY_DISCLOSURE_ACCEPTED, accepted).apply();
     }
 
     // notification on skip ads?
     private static final String SKIP_AD_NOTIFICATION = "SKIP_AD_NOTIFICATION";
-    private boolean bSkipAdNotification;
+    private volatile boolean bSkipAdNotification;
     public boolean isSkipAdNotification() {
         return bSkipAdNotification;
     }
     public void setSkipAdNotification(boolean bSkipAdNotification) {
         if (this.bSkipAdNotification != bSkipAdNotification) {
             this.bSkipAdNotification = bSkipAdNotification;
-            mEditor.putBoolean(SKIP_AD_NOTIFICATION, this.bSkipAdNotification);
-            mEditor.apply();
+            mPreference.edit().putBoolean(SKIP_AD_NOTIFICATION, this.bSkipAdNotification).apply();
         }
     }
 
-
     // duration of skip ad process
     private static final String SKIP_AD_DURATION = "SKIP_AD_DURATION";
-    private int iSkipAdDuration;
+    private volatile int iSkipAdDuration;
     public int getSkipAdDuration() {
         return iSkipAdDuration;
     }
     public void setSkipAdDuration(int iSkipAdDuration) {
         if (this.iSkipAdDuration != iSkipAdDuration) {
             this.iSkipAdDuration = iSkipAdDuration;
-            mEditor.putInt(SKIP_AD_DURATION, this.iSkipAdDuration);
-            mEditor.apply();
+            mPreference.edit().putInt(SKIP_AD_DURATION, this.iSkipAdDuration).apply();
         }
     }
-
 
     // whitelist of packages
     private static final String WHITELIST_PACKAGE = "WHITELIST_PACKAGE";
@@ -163,50 +188,72 @@ public class Settings {
     }
     public synchronized void setWhitelistPackages(Set<String> pkgs) {
         setWhiteListPackages = new HashSet<>(pkgs);
-        // https://stackoverflow.com/questions/10720028/android-sharedpreferences-not-saving
-        mEditor.putStringSet(WHITELIST_PACKAGE, new HashSet<String>(setWhiteListPackages));
-        mEditor.apply();
+        mPreference.edit().putStringSet(WHITELIST_PACKAGE, new HashSet<>(setWhiteListPackages)).apply();
     }
 
     // list of key words
     private static final String KEY_WORDS_LIST = "KEY_WORDS_LIST";
-    // Never mutated in place: the accessibility service iterates this list on its worker
-    // thread, so every change installs a fresh immutable list instead.
     private volatile List<String> listKeyWords;
     public List<String> getKeyWordList() { return listKeyWords; }
     public String getKeyWordsAsString() { return String.join(" ", listKeyWords); }
-    public void setKeyWordList(String text) {
+    public synchronized void setKeyWordList(String text) {
         List<String> keys = SkipAdRules.parseKeywords(text);
         listKeyWords = Collections.unmodifiableList(keys);
         String json = mJson.toJson(keys);
-        mEditor.putString(KEY_WORDS_LIST, json);
-        mEditor.apply();
+        mPreference.edit().putString(KEY_WORDS_LIST, json).apply();
     }
 
     // map of key activity widgets
     private static final String PACKAGE_WIDGETS = "PACKAGE_WIDGETS";
     private volatile Map<String, Set<PackageWidgetDescription>> mapPackageWidgets;
-    public Map<String, Set<PackageWidgetDescription>> getPackageWidgets() { return mapPackageWidgets; }
-    public void setPackageWidgets(Map<String, Set<PackageWidgetDescription>> map) {
-        mapPackageWidgets = map;
-        String json = mJson.toJson(mapPackageWidgets);
-//        Log.d(TAG, json);
-        mEditor.putString(PACKAGE_WIDGETS, json);
-        mEditor.apply();
+
+    public synchronized Map<String, Set<PackageWidgetDescription>> getPackageWidgets() {
+        Map<String, Set<PackageWidgetDescription>> copy = new TreeMap<>();
+        if (mapPackageWidgets != null) {
+            for (Map.Entry<String, Set<PackageWidgetDescription>> entry : mapPackageWidgets.entrySet()) {
+                if (entry.getValue() != null) {
+                    Set<PackageWidgetDescription> setCopy = new HashSet<>();
+                    for (PackageWidgetDescription item : entry.getValue()) {
+                        setCopy.add(new PackageWidgetDescription(item));
+                    }
+                    copy.put(entry.getKey(), setCopy);
+                }
+            }
+        }
+        return copy;
     }
-    public String getPackageWidgetsInString() {
+
+    public synchronized void setPackageWidgets(Map<String, Set<PackageWidgetDescription>> map) {
+        Map<String, Set<PackageWidgetDescription>> copy = new TreeMap<>();
+        if (map != null) {
+            for (Map.Entry<String, Set<PackageWidgetDescription>> entry : map.entrySet()) {
+                if (entry.getValue() != null) {
+                    Set<PackageWidgetDescription> setCopy = new HashSet<>();
+                    for (PackageWidgetDescription item : entry.getValue()) {
+                        setCopy.add(new PackageWidgetDescription(item));
+                    }
+                    copy.put(entry.getKey(), setCopy);
+                }
+            }
+        }
+        mapPackageWidgets = copy;
         String json = mJson.toJson(mapPackageWidgets);
-        return json;
+        mPreference.edit().putString(PACKAGE_WIDGETS, json).apply();
     }
-    public boolean setPackageWidgetsInString(String value) {
+
+    public synchronized String getPackageWidgetsInString() {
+        return mJson.toJson(mapPackageWidgets);
+    }
+
+    public synchronized boolean setPackageWidgetsInString(String value) {
         if (value != null) {
             try {
-                Type type = new TypeToken<TreeMap<String, Set<PackageWidgetDescription>>>() {
-                }.getType();
-                mapPackageWidgets = mJson.fromJson(value, type);
-                mEditor.putString(PACKAGE_WIDGETS, value);
-                mEditor.apply();
-                return true;
+                Type type = new TypeToken<TreeMap<String, Set<PackageWidgetDescription>>>() {}.getType();
+                TreeMap<String, Set<PackageWidgetDescription>> parsed = mJson.fromJson(value, type);
+                if (parsed != null) {
+                    setPackageWidgets(parsed);
+                    return true;
+                }
             } catch (JsonSyntaxException e) {
                 Log.d(TAG, Utilities.getTraceStackInString(e));
                 return false;
@@ -218,13 +265,31 @@ public class Settings {
     // map of key package positions
     private static final String PACKAGE_POSITIONS = "PACKAGE_POSITIONS";
     private volatile Map<String, PackagePositionDescription> mapPackagePositions;
-    public Map<String, PackagePositionDescription> getPackagePositions() { return mapPackagePositions; }
-    public void setPackagePositions(Map<String, PackagePositionDescription> map) {
-        mapPackagePositions = map;
+
+    public synchronized Map<String, PackagePositionDescription> getPackagePositions() {
+        Map<String, PackagePositionDescription> copy = new TreeMap<>();
+        if (mapPackagePositions != null) {
+            for (Map.Entry<String, PackagePositionDescription> entry : mapPackagePositions.entrySet()) {
+                if (entry.getValue() != null) {
+                    copy.put(entry.getKey(), new PackagePositionDescription(entry.getValue()));
+                }
+            }
+        }
+        return copy;
+    }
+
+    public synchronized void setPackagePositions(Map<String, PackagePositionDescription> map) {
+        Map<String, PackagePositionDescription> copy = new TreeMap<>();
+        if (map != null) {
+            for (Map.Entry<String, PackagePositionDescription> entry : map.entrySet()) {
+                if (entry.getValue() != null) {
+                    copy.put(entry.getKey(), new PackagePositionDescription(entry.getValue()));
+                }
+            }
+        }
+        mapPackagePositions = copy;
         String json = mJson.toJson(mapPackagePositions);
-//        Log.d(TAG, json);
-        mEditor.putString(PACKAGE_POSITIONS, json);
-        mEditor.apply();
+        mPreference.edit().putString(PACKAGE_POSITIONS, json).apply();
     }
 
 }

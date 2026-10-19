@@ -32,18 +32,21 @@ public class ManagePackageWidgetsDialogFragment extends DialogFragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-
-        getDialog().setCanceledOnTouchOutside(false);
+        if (getDialog() != null) {
+            getDialog().setCanceledOnTouchOutside(false);
+        }
 
         View view = inflater.inflate(R.layout.layout_manage_package_widgets, container, false);
 
         editRules = view.findViewById(R.id.editText_rules);
         setting = Settings.getInstance();
         originalRules = setting.getPackageWidgetsInString();
-        editRules.setText(originalRules);
+        if (savedInstanceState == null) {
+            editRules.setText(originalRules);
+        }
 
         Button btReset = view.findViewById(R.id.button_reset);
-        if(btReset != null) {
+        if (btReset != null) {
             btReset.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -53,53 +56,61 @@ public class ManagePackageWidgetsDialogFragment extends DialogFragment {
         }
 
         Button btCopy = view.findViewById(R.id.button_copy);
-        if(btCopy != null) {
+        if (btCopy != null) {
             btCopy.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    // Gets a handle to the clipboard service.
-                    ClipboardManager clipboard = (ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData clip = ClipData.newPlainText("Rules: Widget in Packages", editRules.getText().toString());
-                    clipboard.setPrimaryClip(clip);
-
-                    Utilities.toast("规则已复制到剪贴板!");
-                }
-            });
-        }
-
-
-        Button btPaste = view.findViewById(R.id.button_paste);
-        if(btPaste != null) {
-            btPaste.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    ClipboardManager clipboard = (ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData clipData = clipboard.getPrimaryClip();
-                    if(clipData != null && clipData.getItemCount() > 0) {
-                        String pasteData = clipData.getItemAt(0).getText().toString();
-                        editRules.setText(pasteData);
-                        Utilities.toast("已从剪贴板获取规则!");
-                    } else {
-                        Utilities.toast("未从剪贴板发现规则!");
+                    Context context = getContext();
+                    if (context == null) return;
+                    ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (clipboard != null) {
+                        ClipData clip = ClipData.newPlainText("Rules: Widget in Packages", editRules.getText().toString());
+                        clipboard.setPrimaryClip(clip);
+                        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+                            Utilities.toast("规则已复制到剪贴板!");
+                        }
                     }
                 }
             });
         }
 
+        Button btPaste = view.findViewById(R.id.button_paste);
+        if (btPaste != null) {
+            btPaste.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    Context context = getContext();
+                    if (context == null) return;
+                    ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (clipboard != null && clipboard.hasPrimaryClip()) {
+                        ClipData clipData = clipboard.getPrimaryClip();
+                        if (clipData != null && clipData.getItemCount() > 0) {
+                            CharSequence text = clipData.getItemAt(0).coerceToText(context);
+                            if (text != null && text.length() > 0) {
+                                editRules.setText(text.toString());
+                                Utilities.toast("已从剪贴板获取规则!");
+                                return;
+                            }
+                        }
+                    }
+                    Utilities.toast("未从剪贴板发现规则!");
+                }
+            });
+        }
 
         Button btCancel = view.findViewById(R.id.button_widgets_cancel);
-        if(btCancel != null) {
+        if (btCancel != null) {
             btCancel.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
                     Utilities.toast("修改已取消");
-                    getDialog().dismiss();
+                    dismiss();
                 }
             });
         }
 
         Button btRules = view.findViewById(R.id.button_widgets_rules);
-        if(btRules != null) {
+        if (btRules != null) {
             btRules.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -116,21 +127,21 @@ public class ManagePackageWidgetsDialogFragment extends DialogFragment {
         }
 
         Button btConfirm = view.findViewById(R.id.button_widgets_confirm);
-        if(btConfirm != null) {
+        if (btConfirm != null) {
             btConfirm.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
                     boolean result = setting.setPackageWidgetsInString(editRules.getText().toString());
-                    if(result) {
+                    if (result) {
                         Utilities.toast("规则已保存!");
-                        getDialog().dismiss();
+                        com.zfdang.touchhelper.TouchHelperService.dispatchAction(com.zfdang.touchhelper.TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
+                        dismiss();
                     } else {
                         Utilities.toast("规则有误，请修改后再次保存!");
                     }
                 }
             });
         }
-
 
         return view;
     }

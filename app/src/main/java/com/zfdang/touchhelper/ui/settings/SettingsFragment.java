@@ -52,14 +52,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static android.content.Context.WINDOW_SERVICE;
-
 public class SettingsFragment extends PreferenceFragmentCompat {
 
     private final String TAG = getClass().getName();
     LayoutInflater inflater;
     PackageManager packageManager;
-    WindowManager winManager;
+    private AlertDialog whitelistDialog;
 
     Settings mSetting;
 
@@ -76,25 +74,17 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
         initPreferences();
 
-        winManager = (WindowManager) getActivity().getSystemService(WINDOW_SERVICE);
-        inflater = (LayoutInflater)getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        packageManager = getActivity().getPackageManager();
+        inflater = (LayoutInflater) requireActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        packageManager = requireActivity().getPackageManager();
     }
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = super.onCreateView(inflater, container, savedInstanceState);
-
-        // get the height of BottomNavigationView
-        int resourceId = getResources().getIdentifier("design_bottom_navigation_height", "dimen", getActivity().getPackageName());
-        int height = 147;
-        if (resourceId > 0) {
-            height = getResources().getDimensionPixelSize(resourceId);
+    public void onDestroyView() {
+        if (whitelistDialog != null && whitelistDialog.isShowing()) {
+            whitelistDialog.dismiss();
+            whitelistDialog = null;
         }
-
-        // set bottom padding for the preference fragment, so that all parts could be shown properly
-        view.setPadding(view.getPaddingLeft(), view.getPaddingTop(), view.getPaddingRight(), view.getPaddingBottom() + height);
-        return view;
+        super.onDestroyView();
     }
 
     private void initPreferences() {
@@ -214,25 +204,14 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         activity_widgets.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
-                HashSet<String> results = (HashSet<String>) newValue;
-//                Log.d(TAG, "size " + results.size());
-
-                // update activity widgets
-                Set<String> keys = new HashSet<>(mapActivityWidgets.keySet());
-                for(String key: keys){
-                    if(!results.contains(key)) {
-                        // this key is not selected to keep, remove the entry
-                        mapActivityWidgets.remove(key);
-                    }
+                if (newValue instanceof Set) {
+                    @SuppressWarnings("unchecked")
+                    Set<String> results = (Set<String>) newValue;
+                    mapActivityWidgets.keySet().retainAll(results);
+                    Settings.getInstance().setPackageWidgets(mapActivityWidgets);
+                    updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
+                    TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
                 }
-                Settings.getInstance().setPackageWidgets(mapActivityWidgets);
-
-                // refresh MultiSelectListPreference
-                updateMultiSelectListPreferenceEntries(activity_widgets, mapActivityWidgets.keySet());
-
-                // send message to accessibility service
-                TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
-
                 return true;
             }
         });
@@ -261,25 +240,14 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         activity_positions.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
-                HashSet<String> results = (HashSet<String>) newValue;
-//                Log.d(TAG, "size " + results.size());
-
-                // update activity widgets
-                Set<String> keys = new HashSet<>(mapActivityPositions.keySet());
-                for(String key: keys){
-                    if(!results.contains(key)) {
-                        // this key is not selected to keep, remove the entry
-                        mapActivityPositions.remove(key);
-                    }
+                if (newValue instanceof Set) {
+                    @SuppressWarnings("unchecked")
+                    Set<String> results = (Set<String>) newValue;
+                    mapActivityPositions.keySet().retainAll(results);
+                    Settings.getInstance().setPackagePositions(mapActivityPositions);
+                    updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
+                    TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
                 }
-                Settings.getInstance().setPackagePositions(mapActivityPositions);
-
-                // refresh MultiSelectListPreference
-                updateMultiSelectListPreferenceEntries(activity_positions, mapActivityPositions.keySet());
-
-                // send message to accessibility service
-                TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_CUSTOMIZED_ACTIVITY);
-
                 return true;
             }
         });
@@ -355,13 +323,13 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             }
         });
 
-        final AlertDialog dialog = new AlertDialog.Builder(requireContext())
+        whitelistDialog = new AlertDialog.Builder(requireContext())
                 .setView(viewAppList)
                 .create();
 
         Button btCancel = viewAppList.findViewById(R.id.button_cancel);
         if (btCancel != null) {
-            btCancel.setOnClickListener(view -> dialog.dismiss());
+            btCancel.setOnClickListener(view -> whitelistDialog.dismiss());
         }
         Button btConfirm = viewAppList.findViewById(R.id.button_confirm);
         if (btConfirm != null) {
@@ -374,11 +342,11 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                 }
                 mSetting.setWhitelistPackages(pkgWhitelist);
                 TouchHelperService.dispatchAction(TouchHelperService.ACTION_REFRESH_PACKAGE);
-                dialog.dismiss();
+                whitelistDialog.dismiss();
             });
         }
 
-        dialog.show();
+        whitelistDialog.show();
     }
 
     static class AppInformation implements Comparable<AppInformation> {
