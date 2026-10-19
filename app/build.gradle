@@ -34,10 +34,16 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("touch_helper.keystore")
-            storePassword project.findProperty("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD")
-            keyAlias project.findProperty("KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
-            keyPassword project.findProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+            def keystoreFile = file("touch_helper.keystore")
+            def storePass = project.findProperty("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD")
+            def keyAliasName = project.findProperty("KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
+            def keyPass = project.findProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+            if (keystoreFile.exists() && storePass && keyAliasName && keyPass) {
+                storeFile keystoreFile
+                storePassword storePass
+                keyAlias keyAliasName
+                keyPassword keyPass
+            }
         }
     }
 
@@ -47,7 +53,9 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
         }
     }
     testOptions {
@@ -57,22 +65,15 @@ android {
         }
     }
     packagingOptions {
-        jniLibs {
-            excludes += ['pinyindb/*']
-        }
         resources {
-            excludes += ['pinyindb/*']
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/NOTICE']
         }
     }
 
     // http://www.sollyu.com/android-apk-studio-generated-automatically-appends-a-version-number/
     android.applicationVariants.all { variant ->
         variant.outputs.all { output ->
-            if(buildType.name == "release") {
-                output.outputFileName = new File("TouchHelper" + "-" + buildType.name + "-v" + defaultConfig.versionName + ".apk" );
-            } else {
-                output.outputFileName = new File("TouchHelper" + "-" + buildType.name + "-v" + defaultConfig.versionName + ".apk" );
-            }
+            output.outputFileName = "TouchHelper-${variant.buildType.name}-v${defaultConfig.versionName}.apk"
         }
     }
 }

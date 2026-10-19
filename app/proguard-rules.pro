@@ -14,13 +14,20 @@
 
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes SourceFile,LineNumberTable
 
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
-#-renamesourcefileattribute SourceFile
+-renamesourcefileattribute SourceFile
 
 -keep class * extends java.io.Serializable { *; }
+
+# Keep project model classes serialized with GSON
+-keepclassmembers class com.zfdang.touchhelper.PackagePositionDescription { <fields>; }
+-keepclassmembers class com.zfdang.touchhelper.PackageWidgetDescription { <fields>; }
+
+# Keep pinyin4j resources and classes
+-keep class net.sourceforge.pinyin4j.** { *; }
 
 ##---------------Begin: proguard configuration for Gson  ----------
 # Gson uses generic type information stored in a class file when working with fields. Proguard
