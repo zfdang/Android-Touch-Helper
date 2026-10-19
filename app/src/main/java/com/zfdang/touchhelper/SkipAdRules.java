@@ -81,13 +81,46 @@ public final class SkipAdRules {
         }
         String cleanLabel = stripInvisibleChars(label);
         String cleanKeyword = stripInvisibleChars(keyword);
-        if (cleanLabel.length() > cleanKeyword.length() + KEYWORD_MAX_EXTRA_LENGTH) {
-            return false;
+
+        // 1. Direct or substring match (fast path)
+        if (containsIgnoreCase(cleanLabel, cleanKeyword)) {
+            if (cleanLabel.length() <= cleanKeyword.length() + KEYWORD_MAX_EXTRA_LENGTH) {
+                return excludedText == null || !cleanLabel.equalsIgnoreCase(excludedText);
+            }
         }
-        if (!containsIgnoreCase(cleanLabel, cleanKeyword)) {
-            return false;
+
+        // 2. Normalized separator matching for split text like "跳 过", "跳\n过", "跳·过", "[跳过]"
+        String compressedLabel = normalizeSeparators(cleanLabel);
+        String compressedKeyword = normalizeSeparators(cleanKeyword);
+        if (!compressedKeyword.isEmpty() && containsIgnoreCase(compressedLabel, compressedKeyword)) {
+            if (compressedLabel.length() <= compressedKeyword.length() + KEYWORD_MAX_EXTRA_LENGTH) {
+                return excludedText == null || !cleanLabel.equalsIgnoreCase(excludedText);
+            }
         }
-        return excludedText == null || !cleanLabel.equalsIgnoreCase(excludedText);
+        return false;
+    }
+
+    /**
+     * Concatenates text/descriptions from multiple child nodes and checks if together they form
+     * a skip keyword (e.g. child 0: "跳", child 1: "过" -> "跳过", or "跳过" + "5s").
+     */
+    public static String findCompositeKeyword(List<? extends CharSequence> childTexts,
+                                             List<String> keywords,
+                                             String excludedText) {
+        if (childTexts == null || childTexts.size() < 2 || keywords == null || keywords.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder(32);
+        for (int i = 0, n = childTexts.size(); i < n; i++) {
+            CharSequence seq = childTexts.get(i);
+            if (seq != null && seq.length() > 0) {
+                sb.append(seq);
+            }
+        }
+        if (sb.length() == 0) {
+            return null;
+        }
+        return findKeyword(sb.toString(), null, keywords, excludedText);
     }
 
     static boolean containsIgnoreCase(String src, String what) {
@@ -111,6 +144,13 @@ public final class SkipAdRules {
             return "";
         }
         return text.replaceAll("[\u200B-\u200D\uFEFF]", "");
+    }
+
+    static String normalizeSeparators(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replaceAll("[\\s\\p{Z}·\\-_|/•\\[\\]()（）]+", "");
     }
 
     /**
