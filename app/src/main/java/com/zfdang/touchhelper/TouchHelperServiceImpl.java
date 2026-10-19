@@ -1056,20 +1056,27 @@ public class TouchHelperServiceImpl {
     }
 
     private String dumpRootNode(AccessibilityNodeInfo root) {
+        if (root == null) return "";
         ArrayList<AccessibilityNodeInfo> nodeList = new ArrayList<>();
         StringBuilder dumpString = new StringBuilder();
-        dumpChildNodes(root, nodeList, dumpString, "");
-        return dumpString.toString();
+        try {
+            dumpChildNodes(root, nodeList, dumpString, "");
+            return dumpString.toString();
+        } finally {
+            for (AccessibilityNodeInfo node : nodeList) {
+                recycleNode(node);
+            }
+        }
     }
 
     private void dumpChildNodes(AccessibilityNodeInfo root, List<AccessibilityNodeInfo> list, StringBuilder dumpString, String indent) {
         if(root == null) return;
         list.add(root);
-        dumpString.append(indent + Utilities.describeAccessibilityNode(root) + "\n");
+        dumpString.append(indent).append(Utilities.describeAccessibilityNode(root)).append("\n");
 
         for (int n = 0; n < root.getChildCount(); n++) {
             AccessibilityNodeInfo child = root.getChild(n);
-            dumpChildNodes(child, list, dumpString,indent + " ");
+            dumpChildNodes(child, list, dumpString, indent + " ");
         }
     }
 
@@ -1239,6 +1246,31 @@ public class TouchHelperServiceImpl {
         this.setPackages = setPackages;
     }
 
+    private static class NodeOutlineData {
+        final Rect bounds;
+        final boolean clickable;
+        final String className;
+        final String idName;
+        final String description;
+        final String text;
+        final int area;
+
+        NodeOutlineData(AccessibilityNodeInfo node) {
+            this.bounds = new Rect();
+            node.getBoundsInScreen(this.bounds);
+            this.clickable = node.isClickable();
+            CharSequence cls = node.getClassName();
+            this.className = cls == null ? "" : cls.toString();
+            CharSequence id = node.getViewIdResourceName();
+            this.idName = id == null ? "" : id.toString();
+            CharSequence desc = node.getContentDescription();
+            this.description = desc == null ? "" : desc.toString();
+            CharSequence txt = node.getText();
+            this.text = txt == null ? "" : txt.toString();
+            this.area = this.bounds.width() * this.bounds.height();
+        }
+    }
+
     // display activity customization dialog, and allow users to pick widget or positions
     @SuppressLint("ClickableViewAccessibility")
     private void showActivityCustomizationDialog() {
@@ -1380,21 +1412,26 @@ public class TouchHelperServiceImpl {
                     layoutOverlayOutline.removeAllViews();
                     ArrayList<AccessibilityNodeInfo> roots = new ArrayList<>();
                     roots.add(root);
-                    ArrayList<AccessibilityNodeInfo> nodeList = new ArrayList<>();
-                    findAllNode(roots, nodeList, "");
-                    Collections.sort(nodeList, new Comparator<AccessibilityNodeInfo>() {
-                        @Override
-                        public int compare(AccessibilityNodeInfo a, AccessibilityNodeInfo b) {
-                            Rect rectA = new Rect();
-                            Rect rectB = new Rect();
-                            a.getBoundsInScreen(rectA);
-                            b.getBoundsInScreen(rectB);
-                            return rectB.width() * rectB.height() - rectA.width() * rectA.height();
+                    ArrayList<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+                    List<NodeOutlineData> outlineDataList = new ArrayList<>();
+                    try {
+                        findAllNode(roots, allNodes, "");
+                        for (AccessibilityNodeInfo e : allNodes) {
+                            if (e != null) {
+                                outlineDataList.add(new NodeOutlineData(e));
+                            }
                         }
-                    });
-                    for (final AccessibilityNodeInfo e : nodeList) {
-                        final Rect temRect = new Rect();
-                        e.getBoundsInScreen(temRect);
+                    } finally {
+                        for (AccessibilityNodeInfo node : allNodes) {
+                            recycleNode(node);
+                        }
+                    }
+
+                    // Sort by area descending without any Binder IPC
+                    outlineDataList.sort((a, b) -> Integer.compare(b.area, a.area));
+
+                    for (final NodeOutlineData data : outlineDataList) {
+                        final Rect temRect = data.bounds;
                         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(temRect.width(), temRect.height());
                         params.leftMargin = temRect.left;
                         params.topMargin = temRect.top;
@@ -1411,19 +1448,29 @@ public class TouchHelperServiceImpl {
                             @Override
                             public void onFocusChange(View v, boolean hasFocus) {
                                 if (hasFocus) {
-                                    widgetDescription.position = temRect;
-                                    widgetDescription.clickable = e.isClickable();
-                                    widgetDescription.className = e.getClassName().toString();
-                                    CharSequence cId = e.getViewIdResourceName();
-                                    widgetDescription.idName = cId == null ? "" : cId.toString();
-                                    CharSequence cDesc = e.getContentDescription();
-                                    widgetDescription.description = cDesc == null ? "" : cDesc.toString();
-                                    CharSequence cText = e.getText();
-                                    widgetDescription.text = cText == null ? "" : cText.toString();
+                                    widgetDescription.position = new Rect(temRect);
+                                    widgetDescription.clickable = data.clickable;
+                                    widgetDescription.className = data.className;
+                                    widgetDescription.idName = data.idName;
+                                    widgetDescription.description = data.description;
+                                    widgetDescription.text = data.text;
                                     btAddWidget.setEnabled(true);
                                     tvPackageName.setText(widgetDescription.packageName);
                                     tvActivityName.setText(widgetDescription.activityName);
-                                    tvWidgetInfo.setText("click:" + (e.isClickable() ? "true" : "false") + " " + "bonus:" + temRect.toShortString() + " " + "id:" + (cId == null ? "null" : cId.toString().substring(cId.toString().indexOf("id/") + 3)) + " " + "desc:" + (cDesc == null ? "null" : cDesc.toString()) + " " + "text:" + (cText == null ? "null" : cText.toString()));
+
+                                    String idDisplay;
+                                    int idIdx = data.idName.indexOf("id/");
+                                    if (idIdx >= 0) {
+                                        idDisplay = data.idName.substring(idIdx + 3);
+                                    } else {
+                                        idDisplay = data.idName.isEmpty() ? "null" : data.idName;
+                                    }
+
+                                    tvWidgetInfo.setText("click:" + (data.clickable ? "true" : "false")
+                                            + " bonus:" + temRect.toShortString()
+                                            + " id:" + idDisplay
+                                            + " desc:" + (data.description.isEmpty() ? "null" : data.description)
+                                            + " text:" + (data.text.isEmpty() ? "null" : data.text));
                                     v.setBackgroundResource(R.drawable.node_focus);
                                 } else {
                                     v.setBackgroundResource(R.drawable.node);
@@ -1506,11 +1553,15 @@ public class TouchHelperServiceImpl {
                 if (root == null) return;
                 String result = dumpRootNode(root);
 
-                Log.d(TAG, result);
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, result);
+                }
 
                 ClipboardManager clipboard = (ClipboardManager) service.getSystemService(Context.CLIPBOARD_SERVICE);
-                ClipData clip = ClipData.newPlainText("ACTIVITY", result);
-                clipboard.setPrimaryClip(clip);
+                if (clipboard != null) {
+                    ClipData clip = ClipData.newPlainText("ACTIVITY", result);
+                    clipboard.setPrimaryClip(clip);
+                }
 
                 ShowToastInIntentService("窗口控件已复制到剪贴板！");
             }
