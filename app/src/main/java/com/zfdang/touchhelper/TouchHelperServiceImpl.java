@@ -453,7 +453,7 @@ public class TouchHelperServiceImpl {
 
                             // try to click the position in the activity for multiple times
                             final Future<?>[] futures = {null};
-                            futures[0] = taskExecutorService.scheduleAtFixedRate(new Runnable() {
+                            futures[0] = taskExecutorService.scheduleWithFixedDelay(new Runnable() {
                                 int num = 0;
                                 @Override
                                 public void run() {
