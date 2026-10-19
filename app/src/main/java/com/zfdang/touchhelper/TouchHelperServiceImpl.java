@@ -35,6 +35,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.content.ContextCompat;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -270,12 +272,13 @@ public class TouchHelperServiceImpl {
         // without a lock screen. Both are protected system broadcasts.
         IntentFilter wakeup = new IntentFilter(Intent.ACTION_USER_PRESENT);
         wakeup.addAction(Intent.ACTION_SCREEN_ON);
-        service.registerReceiver(userPresentReceiver, wakeup);
+        ContextCompat.registerReceiver(service, userPresentReceiver, wakeup, ContextCompat.RECEIVER_EXPORTED);
         packageChangeReceiver = new PackageChangeReceiver();
         IntentFilter actions = new IntentFilter();
         actions.addAction(Intent.ACTION_PACKAGE_ADDED);
         actions.addAction(Intent.ACTION_PACKAGE_REMOVED);
-        service.registerReceiver(packageChangeReceiver, actions);
+        actions.addDataScheme("package");
+        ContextCompat.registerReceiver(service, packageChangeReceiver, actions, ContextCompat.RECEIVER_EXPORTED);
 
         // install handler to handle broadcast messages
         receiverHandler = new Handler(Looper.getMainLooper(), msg -> {
@@ -394,7 +397,7 @@ public class TouchHelperServiceImpl {
                             wakeupPending = false;
                             // stop current skip ad process if it exists
                             stopSkipAdProcess();
-                            if(setPackages.contains(pkgName)) {
+                            if(isTargetPackage(pkgName)) {
                                 // if the package is in our list, start skip ads process
                                 // this is the only place to start skip ad process
                                 startSkipAdProcess();
@@ -411,7 +414,7 @@ public class TouchHelperServiceImpl {
                         if (wakeupPending && !isScreenLockedOrOff()) {
                             // the covered app is back and the device is unlocked: warm start
                             wakeupPending = false;
-                            if (setPackages.contains(pkgName)) {
+                            if (isTargetPackage(pkgName)) {
                                 if (BuildConfig.DEBUG) {
                                     Log.d(TAG, "warm start of " + pkgName + " after the lock screen, start to skip ads");
                                 }
@@ -1094,6 +1097,12 @@ public class TouchHelperServiceImpl {
     // apps that show a warm-start ad after the screen was unlocked do so within about a second
     private static final long WAKEUP_RESCAN_DELAY_MS = 1000;
 
+    private boolean isTargetPackage(String pkg) {
+        return pkg != null && (setPackages.contains(pkg)
+                || mapPackageWidgets.containsKey(pkg)
+                || mapPackagePositions.containsKey(pkg));
+    }
+
     /**
      * The screen was turned on or unlocked while an app was in the foreground. Many apps show a
      * splash ad on such a warm start, so restart the skip-ad process for that app and scan its
@@ -1107,7 +1116,7 @@ public class TouchHelperServiceImpl {
             return;
         }
         final String pkg = currentPackageName;
-        if (pkg == null || !setPackages.contains(pkg)) {
+        if (pkg == null || !isTargetPackage(pkg)) {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "wakeup while in " + pkg + ", not a target package");
             }
