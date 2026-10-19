@@ -1095,6 +1095,10 @@ public class TouchHelperServiceImpl {
      * keyguard, IME).
      */
     private void resumeSkipAdAfterWakeup() {
+        if (!mSetting.isDisclosureAccepted()) {
+            remindDisclosureOnce();
+            return;
+        }
         final String pkg = currentPackageName;
         if (pkg == null || !setPackages.contains(pkg)) {
             if (BuildConfig.DEBUG) {
@@ -1147,6 +1151,9 @@ public class TouchHelperServiceImpl {
      * start the skip-ad process
      */
     private void startSkipAdProcess() {
+        if (!mSetting.isDisclosureAccepted()) {
+            return;
+        }
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Start Skip-ad process");
         }
