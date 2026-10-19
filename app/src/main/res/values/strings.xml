@@ -4,6 +4,8 @@
     <string name="title_settings">设置</string>
     <string name="title_about">关于</string>
     <string name="status_title">服务状态</string>
+
+    <!-- Legacy strings preserved for compatibility -->
     <string name="text_instructions">\"开屏跳过\"基于安卓系统的无障碍服务来实现跳过自动广告功能，开源不联网，绝对安全！为保证程序能正常工作，请检查以下设置：</string>
     <string name="text_accessibility_permission">1. 在\"无障碍\"设置里，打开\"开屏跳过 - 无障碍服务\"。</string>
     <string name="text_power_permission">2. 在\"电池优化\"设置里，设置\"开屏跳过\"为\"不优化\"。</string>
@@ -11,8 +13,54 @@
     <string name="text_task_manager">4. 在\"任务管理\"里，锁定\"开屏跳过\"。</string>
     <string name="text_status_help">更多信息，请访问网址:</string>
     <string name="text_status_weblink">https://touchhelper.zfdang.com/enable</string>
-
     <string name="button_setting">设置</string>
+
+    <!-- Modern Status UI Strings -->
+    <string name="status_hero_running_title">服务正常运行中</string>
+    <string name="status_hero_running_desc">已就绪，正在后台自动跳过开屏广告</string>
+    <string name="status_hero_stopped_title">无障碍服务未开启</string>
+    <string name="status_hero_stopped_desc">需开启无障碍服务，方可检测并自动点击跳过</string>
+    <string name="status_hero_btn_enable">立即开启服务</string>
+
+    <string name="status_pill_running">运行中</string>
+    <string name="status_pill_stopped">未开启</string>
+
+    <string name="status_badge_enabled">已开启</string>
+    <string name="status_badge_enable">去开启</string>
+    <string name="status_badge_optimized">已忽略</string>
+    <string name="status_badge_optimize">去设置</string>
+    <string name="status_badge_view_tips">查看说明</string>
+
+    <string name="banner_privacy_title">开源安全 · 本地比对 · 零网络权限</string>
+    <string name="banner_privacy_desc">不申请网络权限，界面匹配全部在本地执行，绝不收集或上传任何个人数据。</string>
+
+    <string name="section_guide_title">系统配置与保活向导</string>
+    <string name="section_guide_subtitle">完成以下设置，确保跳过服务常驻不被后台误杀</string>
+
+    <string name="item_accessibility_title">无障碍服务</string>
+    <string name="item_accessibility_tag">必须</string>
+    <string name="item_accessibility_desc">核心权限，用于查找跳过按钮并模拟点击</string>
+
+    <string name="item_battery_title">忽略电池优化</string>
+    <string name="item_battery_tag">推荐</string>
+    <string name="item_battery_desc">加入系统电池优化白名单，防止息屏后被休眠冻结</string>
+
+    <string name="item_rom_battery_title">后台耗电与自启动权限</string>
+    <string name="item_rom_battery_desc">允许应用后台活动、自启动与关联启动</string>
+
+    <string name="item_task_lock_title">多任务界面锁定应用</string>
+    <string name="item_task_lock_desc">在最近任务列表中将应用卡片下拉加锁，避免一键清理</string>
+
+    <string name="card_help_title">各机型详细图文保活教程</string>
+    <string name="card_help_desc">https://touchhelper.zfdang.com/enable</string>
+
+    <string name="dialog_rom_battery_title">后台耗电与自启动设置说明</string>
+    <string name="dialog_rom_battery_message">各品牌系统的后台策略有所不同，建议进行如下设置：\n\n• OPPO / OnePlus (ColorOS)：\n设置 -> 应用 -> 应用管理 -> 开屏跳过 -> 耗电管理 -> 允许唤醒前台、允许完全后台行为。\n\n• 小米 / Redmi (HyperOS / MIUI)：\n设置 -> 应用设置 -> 自启动管理 -> 允许开屏跳过自启动；省电策略设为\"无限制\"。\n\n• VIVO / iQOO (OriginOS)：\n设置 -> 电池 -> 后台耗电管理 -> 开屏跳过 -> 允许高耗电。\n\n• 华为 / 荣耀 (HarmonyOS / MagicOS)：\n设置 -> 应用和服务 -> 应用启动管理 -> 开屏跳过 -> 关闭自动管理，开启允许自启动、允许后台活动。</string>
+    <string name="dialog_task_lock_title">多任务锁定说明</string>
+    <string name="dialog_task_lock_message">从屏幕底部上滑并停顿进入多任务（最近任务）界面：\n\n1. 找到\"开屏跳过\"卡片。\n2. 长按卡片、点击右上角小锁图标或下拉卡片，选择\"锁定\"。\n3. 锁定后卡片将出现小锁标记，在点击\"一键清理\"时不会被关闭。</string>
+    <string name="dialog_ok">我知道了</string>
+
+    <!-- Service & About Strings -->
     <string name="touch_helper_service_label">开屏跳过-无障碍服务</string>
     <string name="touch_helper_service_description">\"开屏跳过\"是基于安卓系统的无障碍服务来实现自动跳过广告功能的，为了保证程序能正常工作，打开此服务。\n\n本程序为开源程序，不需要网络权限，不会收集或上传任何个人信息，请放心使用！</string>
     <string name="about_app_introduction">
@@ -22,14 +70,13 @@
         \n2. 应用里的指定控件。当应用工作时，自动查找对应的控件，如果找到则自动点击；
         \n3. 应用里的指定位置。当应用工作时，自动点击对应的区域。
         \n\n上述三种方法可以在\"设置\"里做具体设置。
-        \n\n详细信息，请访问网站:
     </string>
 
     <string name="about_weblink">https://touchhelper.zfdang.com/</string>
     <string name="about_privacy_policy">隐私政策：\nhttps://touchhelper.zfdang.com/privacy.html</string>
     <string name="about_copyright">Copyright © 2022 Zhengfa Dang</string>
 
-    <string name="app_version">版本: %s (%d)</string>
+    <string name="app_version">版本: %1$s (%2$d)</string>
     <string name="accessibility_disclosure_title">开启无障碍服务前请了解</string>
     <string name="accessibility_disclosure_message">\"开屏跳过\"通过安卓无障碍服务读取当前屏幕上的界面内容（控件文字、描述和位置），用于识别并自动点击开屏广告的\"跳过\"按钮。\n\n· 自动识别时，这些内容只在本机内存中即时比对，不保存。\n· 当您使用\"添加程序的跳过方法\"时，您所选控件的文字、描述和坐标会作为规则保存在本机的应用数据中，可在设置中查看或删除。\n· 当您使用\"复制窗口控件\"时，当前窗口的控件信息会按您的操作复制到系统剪贴板。\n\n本程序不申请网络权限，不会收集或上传任何数据。同意后即可开启无障碍服务；未同意前服务不会读取任何界面内容。</string>
     <string name="accessibility_disclosure_agree">同意并前往设置</string>

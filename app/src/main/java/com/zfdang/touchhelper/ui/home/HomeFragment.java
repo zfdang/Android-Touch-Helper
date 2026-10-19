@@ -3,26 +3,23 @@ package com.zfdang.touchhelper.ui.home;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ResolveInfo;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.zfdang.touchhelper.R;
 import com.zfdang.touchhelper.TouchHelperService;
 import com.zfdang.touchhelper.Utilities;
@@ -32,71 +29,153 @@ public class HomeFragment extends Fragment {
     private final String TAG = getClass().getName();
 
     private HomeViewModel homeViewModel;
+    private AlertDialog disclosureDialog;
+    private AlertDialog tipDialog;
 
+    @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         homeViewModel = new ViewModelProvider(this).get(HomeViewModel.class);
         View root = inflater.inflate(R.layout.fragment_home, container, false);
 
-        final Drawable drawableYes = ContextCompat.getDrawable(getContext(), R.drawable.ic_right);
-        final Drawable drawableNo = ContextCompat.getDrawable(getContext(), R.drawable.ic_wrong);
+        // 1. Hero Status Card
+        final MaterialCardView cardServiceStatus = root.findViewById(R.id.card_service_status);
+        final ImageView imageServiceStatusHero = root.findViewById(R.id.image_service_status_hero);
+        final TextView textServiceStatusTitle = root.findViewById(R.id.text_service_status_title);
+        final TextView textServiceStatusDesc = root.findViewById(R.id.text_service_status_desc);
+        final TextView statusBadgeHero = root.findViewById(R.id.status_badge_hero);
+        final MaterialButton buttonStartService = root.findViewById(R.id.button_start_service);
 
-        // set observers for widget
-        final ImageView imageAccessibilityPermission = root.findViewById(R.id.image_accessibility_permission);
-        homeViewModel.getAccessibilityPermission().observe(getViewLifecycleOwner(), new Observer<Boolean>() {
-            @Override
-            public void onChanged(Boolean aBoolean) {
-                if(aBoolean) {
-                    imageAccessibilityPermission.setImageDrawable(drawableYes);
-                } else {
-                    imageAccessibilityPermission.setImageDrawable(drawableNo);
-                }
+        // 2. Checklist items & badges
+        final MaterialCardView cardAccessibility = root.findViewById(R.id.card_accessibility_permission);
+        final TextView textAccessibilityBadge = root.findViewById(R.id.text_accessibility_badge);
+
+        final MaterialCardView cardPower = root.findViewById(R.id.card_power_permission);
+        final TextView textPowerBadge = root.findViewById(R.id.text_power_badge);
+
+        final MaterialCardView cardRomBattery = root.findViewById(R.id.card_rom_battery);
+        final MaterialCardView cardTaskLock = root.findViewById(R.id.card_task_lock);
+        final MaterialCardView cardHelpLink = root.findViewById(R.id.card_help_link);
+
+        // Observe Accessibility status
+        homeViewModel.getAccessibilityPermission().observe(getViewLifecycleOwner(), isRunning -> {
+            Context context = getContext();
+            if (context == null) return;
+
+            boolean running = Boolean.TRUE.equals(isRunning);
+            if (running) {
+                // Running state
+                cardServiceStatus.setCardBackgroundColor(ContextCompat.getColor(context, R.color.status_running_bg));
+                cardServiceStatus.setStrokeColor(ContextCompat.getColor(context, R.color.status_running_stroke));
+                imageServiceStatusHero.setImageResource(R.drawable.ic_shield_check_24);
+                textServiceStatusTitle.setText(R.string.status_hero_running_title);
+                textServiceStatusTitle.setTextColor(ContextCompat.getColor(context, R.color.status_running_text));
+                textServiceStatusDesc.setText(R.string.status_hero_running_desc);
+                textServiceStatusDesc.setTextColor(ContextCompat.getColor(context, R.color.status_running_text));
+
+                statusBadgeHero.setText(R.string.status_pill_running);
+                statusBadgeHero.setBackgroundResource(R.drawable.bg_badge_running);
+                statusBadgeHero.setTextColor(ContextCompat.getColor(context, R.color.status_running_badge_text));
+
+                buttonStartService.setVisibility(View.GONE);
+
+                textAccessibilityBadge.setText(R.string.status_badge_enabled);
+                textAccessibilityBadge.setBackgroundResource(R.drawable.bg_badge_running);
+                textAccessibilityBadge.setTextColor(ContextCompat.getColor(context, R.color.status_running_badge_text));
+            } else {
+                // Stopped state
+                cardServiceStatus.setCardBackgroundColor(ContextCompat.getColor(context, R.color.status_stopped_bg));
+                cardServiceStatus.setStrokeColor(ContextCompat.getColor(context, R.color.status_stopped_stroke));
+                imageServiceStatusHero.setImageResource(R.drawable.ic_shield_alert_24);
+                textServiceStatusTitle.setText(R.string.status_hero_stopped_title);
+                textServiceStatusTitle.setTextColor(ContextCompat.getColor(context, R.color.status_stopped_text));
+                textServiceStatusDesc.setText(R.string.status_hero_stopped_desc);
+                textServiceStatusDesc.setTextColor(ContextCompat.getColor(context, R.color.status_stopped_text));
+
+                statusBadgeHero.setText(R.string.status_pill_stopped);
+                statusBadgeHero.setBackgroundResource(R.drawable.bg_badge_stopped);
+                statusBadgeHero.setTextColor(ContextCompat.getColor(context, R.color.status_stopped_badge_text));
+
+                buttonStartService.setVisibility(View.VISIBLE);
+
+                textAccessibilityBadge.setText(R.string.status_badge_enable);
+                textAccessibilityBadge.setBackgroundResource(R.drawable.bg_badge_action);
+                textAccessibilityBadge.setTextColor(ContextCompat.getColor(context, R.color.colorPrimary));
             }
         });
 
-        final ImageView imagePowerPermission = root.findViewById(R.id.image_power_permission);
-        homeViewModel.getPowerOptimization().observe(getViewLifecycleOwner(), new Observer<Boolean>() {
-            @Override
-            public void onChanged(Boolean aBoolean) {
-                if(aBoolean) {
-                    imagePowerPermission.setImageDrawable(drawableYes);
-                } else {
-                    imagePowerPermission.setImageDrawable(drawableNo);
-                }
+        // Observe Battery Optimization status
+        homeViewModel.getPowerOptimization().observe(getViewLifecycleOwner(), isOptimized -> {
+            Context context = getContext();
+            if (context == null) return;
+
+            boolean optimized = Boolean.TRUE.equals(isOptimized);
+            if (optimized) {
+                textPowerBadge.setText(R.string.status_badge_optimized);
+                textPowerBadge.setBackgroundResource(R.drawable.bg_badge_running);
+                textPowerBadge.setTextColor(ContextCompat.getColor(context, R.color.status_running_badge_text));
+            } else {
+                textPowerBadge.setText(R.string.status_badge_optimize);
+                textPowerBadge.setBackgroundResource(R.drawable.bg_badge_action);
+                textPowerBadge.setTextColor(ContextCompat.getColor(context, R.color.colorPrimary));
             }
         });
 
+        // Listeners
+        buttonStartService.setOnClickListener(v -> showAccessibilityDisclosure());
+        cardAccessibility.setOnClickListener(v -> showAccessibilityDisclosure());
 
-        // set listener for buttons
-        final ImageButton btAccessibilityPermission = root.findViewById(R.id.button_accessibility_permission);
-        btAccessibilityPermission.setOnClickListener(v -> showAccessibilityDisclosure());
+        cardPower.setOnClickListener(v -> openBatteryOptimization());
 
-        final ImageButton btPowerPermission = root.findViewById(R.id.button_power_permission);
-        btPowerPermission.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // 打开电池优化的界面，让用户设置
-                try {
-                    Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                    startActivity(intent);
-                } catch (ActivityNotFoundException e) {
-                    Utilities.toast("未找到系统电池优化设置页面！");
-                }
-            }
-        });
+        cardRomBattery.setOnClickListener(v -> showTipDialog(
+                R.string.dialog_rom_battery_title,
+                R.string.dialog_rom_battery_message));
 
-        // get the service status
+        cardTaskLock.setOnClickListener(v -> showTipDialog(
+                R.string.dialog_task_lock_title,
+                R.string.dialog_task_lock_message));
+
+        cardHelpLink.setOnClickListener(v -> openWebUrl("https://touchhelper.zfdang.com/enable"));
+
+        // Refresh state
         checkServiceStatus();
 
         return root;
+    }
+
+    private void openBatteryOptimization() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            Utilities.toast("未找到系统电池优化设置页面！");
+        }
+    }
+
+    private void openWebUrl(String url) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            startActivity(intent);
+        } catch (Exception e) {
+            Utilities.toast("无法打开浏览器: " + url);
+        }
+    }
+
+    private void showTipDialog(int titleRes, int messageRes) {
+        if (tipDialog != null && tipDialog.isShowing()) {
+            tipDialog.dismiss();
+        }
+        tipDialog = new AlertDialog.Builder(requireContext())
+                .setTitle(titleRes)
+                .setMessage(messageRes)
+                .setPositiveButton(R.string.dialog_ok, null)
+                .show();
     }
 
     @Override
     public void onResume() {
         checkServiceStatus();
         super.onResume();
-        // the service was enabled from the system settings (or before the disclosure existed)
-        // but the user has not confirmed the disclosure yet: it stays idle until they do
         if (TouchHelperService.isServiceRunning()
                 && !com.zfdang.touchhelper.Settings.getInstance().isDisclosureAccepted()) {
             showAccessibilityDisclosure();
@@ -108,14 +187,12 @@ public class HomeFragment extends Fragment {
         if (disclosureDialog != null && disclosureDialog.isShowing()) {
             disclosureDialog.dismiss();
         }
+        if (tipDialog != null && tipDialog.isShowing()) {
+            tipDialog.dismiss();
+        }
         super.onPause();
     }
 
-    /**
-     * Google Play requires a prominent in-app disclosure before an app sends the user to enable
-     * an accessibility service that is not an assistive tool: what the service reads, what it
-     * does with it, and that nothing leaves the device.
-     */
     private void showAccessibilityDisclosure() {
         if (com.zfdang.touchhelper.Settings.getInstance().isDisclosureAccepted()) {
             openAccessibilitySettings();
@@ -139,8 +216,6 @@ public class HomeFragment extends Fragment {
                 .show();
     }
 
-    private AlertDialog disclosureDialog;
-
     private void openAccessibilitySettings() {
         try {
             Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
@@ -151,7 +226,7 @@ public class HomeFragment extends Fragment {
         }
     }
 
-    public void checkServiceStatus(){
+    public void checkServiceStatus() {
         Context context = getContext();
         if (context != null) {
             homeViewModel.refreshServiceStatus(context.getApplicationContext());
