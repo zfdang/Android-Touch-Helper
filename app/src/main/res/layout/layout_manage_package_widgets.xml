@@ -11,12 +11,12 @@
 
         <TextView
             android:id="@+id/textView_caption"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:paddingLeft="5dp"
+            android:labelFor="@+id/editText_rules"
+            android:paddingStart="5dp"
             android:paddingTop="10dp"
-            android:paddingRight="5dp"
+            android:paddingEnd="5dp"
             android:paddingBottom="10dp"
             android:text="编辑程序按钮跳过的规则："
             android:textColor="@color/textColor"
@@ -30,9 +30,10 @@
 
         <EditText
             android:id="@+id/editText_rules"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="250dp"
             android:gravity="start|top"
+            android:importantForAutofill="no"
             android:inputType="textMultiLine"
             android:isScrollContainer="false"
             android:maxLines="15"
@@ -74,7 +75,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_weight="1"
         android:orientation="horizontal">
 
         <Button

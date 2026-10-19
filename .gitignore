@@ -75,3 +75,4 @@ lint/tmp/
 
 
 .vscode/
+.omc/
