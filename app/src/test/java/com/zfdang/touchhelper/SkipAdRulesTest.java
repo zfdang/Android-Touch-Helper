@@ -91,6 +91,30 @@ public class SkipAdRulesTest {
         assertEquals("跳过", SkipAdRules.findKeyword("跳过", null, withBlank, SELF));
     }
 
+    @Test
+    public void findKeyword_matchesSplitKeywordsWithSpacesOrSeparators() {
+        assertEquals("跳过", SkipAdRules.findKeyword("跳 过", null, KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findKeyword("跳\n过", null, KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findKeyword("跳　过", null, KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findKeyword("跳·过", null, KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findKeyword("[跳过]", null, KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findKeyword("(跳过)", null, KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findKeyword("跳-过", null, KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findKeyword("跳/过", null, KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findKeyword("跳  过 5s", null, KEYWORDS, SELF));
+    }
+
+    @Test
+    public void findCompositeKeyword_concatenatesChildTexts() {
+        assertEquals("跳过", SkipAdRules.findCompositeKeyword(Arrays.asList("跳", "过"), KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findCompositeKeyword(Arrays.asList("跳", "过", "5s"), KEYWORDS, SELF));
+        assertEquals("跳过", SkipAdRules.findCompositeKeyword(Arrays.asList("5s", "跳过"), KEYWORDS, SELF));
+        assertEquals("Skip", SkipAdRules.findCompositeKeyword(Arrays.asList("Sk", "ip"), KEYWORDS, SELF));
+        assertNull(SkipAdRules.findCompositeKeyword(Arrays.asList("跳", "跃"), KEYWORDS, SELF));
+        assertNull(SkipAdRules.findCompositeKeyword(Collections.singletonList("跳过"), KEYWORDS, SELF));
+        assertNull(SkipAdRules.findCompositeKeyword(null, KEYWORDS, SELF));
+    }
+
     // ---------------------------------------------------------------- findWidget
 
     private static PackageWidgetDescription rule(int l, int t, int r, int b, String id, String desc, String text) {

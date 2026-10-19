@@ -765,7 +765,8 @@ public class TouchHelperServiceImpl {
                     break;
                 }
                 boolean isCandidate = false;
-                if (keywords != null && keywordCandidate == null && matchesKeyword(node, keywords, session)) {
+                if (keywords != null && keywordCandidate == null
+                        && (matchesKeyword(node, keywords, session) || matchesCompositeKeyword(node, keywords, session))) {
                     if (widgets == null) {
                         clickKeywordNode(node, keywords, session);
                         handled = true;
@@ -839,6 +840,56 @@ public class TouchHelperServiceImpl {
     }
 
     /**
+     * 检查复合控件：当当前容器本身没有文本时，检查其直接子节点的文本拼接后是否匹配跳过关键字（如子控件1:"跳", 子控件2:"过"）。
+     */
+    private boolean matchesCompositeKeyword(AccessibilityNodeInfo node, List<String> keywords, ClickSession session) {
+        if (node == null || keywords == null || keywords.isEmpty()) {
+            return false;
+        }
+        int childCount = node.getChildCount();
+        if (childCount < 2 || childCount > 5) {
+            return false;
+        }
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        DisplayMetrics metrics = service.getResources().getDisplayMetrics();
+        int maxAllowedWidth = (int) (metrics.widthPixels * 0.7);
+        int maxAllowedHeight = (int) (metrics.heightPixels * 0.25);
+        if (bounds.width() <= 0 || bounds.height() <= 0
+                || bounds.width() > maxAllowedWidth || bounds.height() > maxAllowedHeight) {
+            return false;
+        }
+
+        List<CharSequence> childTexts = new ArrayList<>(childCount);
+        for (int i = 0; i < childCount; i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                CharSequence text = child.getText();
+                if (text != null && text.length() > 0) {
+                    childTexts.add(text);
+                } else {
+                    CharSequence desc = child.getContentDescription();
+                    if (desc != null && desc.length() > 0) {
+                        childTexts.add(desc);
+                    }
+                }
+                recycleNode(child);
+            }
+        }
+        if (childTexts.size() < 2) {
+            return false;
+        }
+        String keyword = SkipAdRules.findCompositeKeyword(childTexts, keywords, SelfPackageName);
+        if (keyword == null) {
+            return false;
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "identify composite keyword = " + keyword + " in container class=" + node.getClassName());
+        }
+        return canClick(clickKey(node), session);
+    }
+
+    /**
      * 点击包含关键字的控件
      */
     private void clickKeywordNode(AccessibilityNodeInfo node, final List<String> keywords, ClickSession session) {
@@ -850,8 +901,31 @@ public class TouchHelperServiceImpl {
         clickNode(node, bounds, false, "正在根据关键字跳过广告...", session, refreshed -> {
             CharSequence text = refreshed.getText();
             CharSequence description = refreshed.getContentDescription();
-            return SkipAdRules.findKeyword(text == null ? null : text.toString(),
-                    description == null ? null : description.toString(), keywords, SelfPackageName) != null;
+            if (SkipAdRules.findKeyword(text == null ? null : text.toString(),
+                    description == null ? null : description.toString(), keywords, SelfPackageName) != null) {
+                return true;
+            }
+            int childCount = refreshed.getChildCount();
+            if (childCount >= 2 && childCount <= 5) {
+                List<CharSequence> childTexts = new ArrayList<>(childCount);
+                for (int i = 0; i < childCount; i++) {
+                    AccessibilityNodeInfo child = refreshed.getChild(i);
+                    if (child != null) {
+                        CharSequence ct = child.getText();
+                        if (ct != null && ct.length() > 0) {
+                            childTexts.add(ct);
+                        } else {
+                            CharSequence cd = child.getContentDescription();
+                            if (cd != null && cd.length() > 0) {
+                                childTexts.add(cd);
+                            }
+                        }
+                        recycleNode(child);
+                    }
+                }
+                return SkipAdRules.findCompositeKeyword(childTexts, keywords, SelfPackageName) != null;
+            }
+            return false;
         });
     }
 
@@ -893,6 +967,47 @@ public class TouchHelperServiceImpl {
     }
 
     /**
+     * Traverses up the node hierarchy (up to maxLevels) to find a clickable ancestor container.
+     * Often TextView labels have isClickable=false, while an enclosing FrameLayout / ViewGroup
+     * is the actual click listener target.
+     *
+     * @param node starting node
+     * @param maxLevels maximum upward steps (e.g. 5)
+     * @return the clickable ancestor node (caller must recycle), or null if none found
+     */
+    AccessibilityNodeInfo findClickableAncestor(AccessibilityNodeInfo node, int maxLevels) {
+        if (node == null) return null;
+        DisplayMetrics metrics = service.getResources().getDisplayMetrics();
+        int maxAllowedWidth = (int) (metrics.widthPixels * 0.85);
+        int maxAllowedHeight = (int) (metrics.heightPixels * 0.35);
+
+        AccessibilityNodeInfo current = node;
+        Rect bounds = new Rect();
+        for (int i = 0; i < maxLevels; i++) {
+            AccessibilityNodeInfo parent = current.getParent();
+            if (current != node) {
+                recycleNode(current);
+            }
+            if (parent == null) {
+                break;
+            }
+            if (parent.isClickable()) {
+                parent.getBoundsInScreen(bounds);
+                // Ensure the clickable ancestor is a button-like container and not the full screen
+                if (bounds.width() > 0 && bounds.height() > 0
+                        && bounds.width() <= maxAllowedWidth && bounds.height() <= maxAllowedHeight) {
+                    return parent;
+                }
+            }
+            current = parent;
+        }
+        if (current != null && current != node) {
+            recycleNode(current);
+        }
+        return null;
+    }
+
+    /**
      * Click a matched widget, escalating from ACTION_CLICK to a touch gesture when the widget
      * is still on screen at the next sighting (see {@link #MAX_CLICK_ATTEMPTS}). Only clicks
      * that are actually issued count as attempts.
@@ -914,15 +1029,19 @@ public class TouchHelperServiceImpl {
         if (!useGesture) {
             boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             if (!clicked) {
-                // the label itself is often not clickable, its container is
-                AccessibilityNodeInfo parent = node.getParent();
-                if (parent != null) {
-                    clicked = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                    recycleNode(parent);
+                // The label itself is often not clickable (or performAction failed):
+                // bubble up through ancestors to find an enclosing clickable container
+                AccessibilityNodeInfo ancestor = findClickableAncestor(node, 5);
+                if (ancestor != null) {
+                    clicked = ancestor.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "clickable ancestor (" + ancestor.getClassName() + ") clicked = " + clicked);
+                    }
+                    recycleNode(ancestor);
                 }
             }
             if (BuildConfig.DEBUG) {
-                Log.d(TAG, "self clicked = " + clicked);
+                Log.d(TAG, "self/ancestor clicked = " + clicked);
             }
             // ACTION_CLICK was issued either way; a rejected one is retried as a gesture now
             issued = true;
